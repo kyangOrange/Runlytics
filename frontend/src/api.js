@@ -20,11 +20,12 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  signup: (email, password) =>
+  signup: (body) =>
     request('/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(body),
     }),
+  getProfile: (userId) => request(`/user/${userId}/profile`),
   login: (email, password) =>
     request('/auth/login', {
       method: 'POST',

@@ -7,6 +7,7 @@ import { Home } from './pages/Home'
 import { TestIntake } from './pages/TestIntake'
 import { TestQuestions } from './pages/TestQuestions'
 import { TestResults } from './pages/TestResults'
+import { Profile } from './pages/Profile'
 import './App.css'
 
 function RootRedirect() {
@@ -25,6 +26,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Home />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Profile />
           </ProtectedRoute>
         }
       />

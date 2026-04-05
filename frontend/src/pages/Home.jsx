@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAppState } from '../context/AppStateContext'
 
 export function Home() {
-  const { logout, setSessionId } = useAppState()
+  const { setSessionId } = useAppState()
   const navigate = useNavigate()
 
   function startTest() {
@@ -17,12 +17,9 @@ export function Home() {
         <button
           type="button"
           className="icon-btn"
-          onClick={() => {
-            logout()
-            navigate('/login', { replace: true })
-          }}
-          title="Account / log out"
-          aria-label="Log out"
+          onClick={() => navigate('/profile')}
+          title="Profile"
+          aria-label="Open profile"
         >
           <svg
             className="icon-btn__svg"

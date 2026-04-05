@@ -2,7 +2,7 @@
 
 Running-injury triage MVP: a **Flask** API with a **Bayesian** inference engine and **React** (Vite) frontend. Users sign up, run a short symptom questionnaire, and get a probability-weighted triage summary.
 
-**Congressional App Challenge:** submit your **demo video** plus this **full source code** (e.g. [GitHub](https://github.com/kyangOrange/Runlytics)). For the demo, use a **public URL** from the cloud deploy below—judges should not need your laptop.
+
 
 ## Stack
 
@@ -119,9 +119,10 @@ The API allows `http://localhost:5173` and `http://127.0.0.1:5173` by default. F
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Health check for monitors |
-| `POST` | `/auth/signup` | Body: `{ "email", "password" }` |
+| `POST` | `/auth/signup` | Body: `email`, `password`, `display_name`, `age`, `biological_sex` (`female` \| `male` \| `other` \| `prefer_not_say`), `prior_injury_same_area`, `equipment_bodyweight_only` (booleans). Profile fields (except name/email/equipment flag for triage) adjust **starting priors** in `bayesian_engine` via `prior_modifiers.py`. |
 | `POST` | `/auth/login` | Body: `{ "email", "password" }` |
-| `POST` | `/session/new` | Body: `{ "user_id" }` |
+| `GET` | `/user/<user_id>/profile` | Public profile JSON (no password hash). |
+| `POST` | `/session/new` | Body: `{ "user_id" }` — loads user row and builds engine with **profile-adjusted priors**. |
 | `GET` | `/session/<id>/next-question` | Next question or `{ "complete": true }` |
 | `POST` | `/session/<id>/answer` | Body: `{ "symptom", "answer" }` (boolean) |
 | `GET` | `/session/<id>/triage` | Probabilities + triage text |

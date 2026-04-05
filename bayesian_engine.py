@@ -1,11 +1,13 @@
+from typing import Any
+
+from prior_modifiers import priors_from_profile
+
+
 class BayesianInferenceEngine:
-    def __init__(self, verbose: bool = True):
+    def __init__(self, verbose: bool = True, profile: dict[str, Any] | None = None):
         self.verbose = verbose
-        # Priors: P(condition)
-        self.probabilities = {
-            "shin_splints": 0.7,
-            "stress_fracture": 0.3,
-        }
+        # Priors: P(condition), optionally adjusted from user profile before symptoms
+        self.probabilities = dict(priors_from_profile(profile))
 
         # Likelihoods: P(symptom | condition)
         # Placeholder values — tune/replace with real estimates later.

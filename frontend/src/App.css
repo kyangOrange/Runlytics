@@ -321,3 +321,124 @@
   color: var(--text);
   line-height: 1.5;
 }
+
+.page--signup {
+  max-width: 32rem;
+}
+
+.form--signup {
+  gap: 1.25rem;
+}
+
+.form__fieldset {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.form__fieldset legend {
+  padding: 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.form__label select {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  background: var(--surface);
+  font-family: inherit;
+}
+
+.form__hint {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.form__hint--inline {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.form__checkbox {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.form__checkbox input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.btn--small {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  align-self: flex-start;
+}
+
+.profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.profile-header h1 {
+  margin: 0;
+}
+
+.page--profile {
+  max-width: 36rem;
+}
+
+.profile-dl {
+  margin: 0 0 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.profile-dl__row {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-dl__row:last-of-type {
+  border-bottom: none;
+}
+
+.profile-dl dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 0 0 0.25rem;
+}
+
+.profile-dl dd {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.profile-dl__why {
+  font-size: 0.8rem !important;
+  font-weight: 400 !important;
+  color: var(--text-muted) !important;
+  margin-top: 0.35rem !important;
+  line-height: 1.4;
+}
