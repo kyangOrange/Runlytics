@@ -26,6 +26,11 @@ export const api = {
       body: JSON.stringify(body),
     }),
   getProfile: (userId) => request(`/user/${userId}/profile`),
+  patchProfile: (userId, body) =>
+    request(`/user/${userId}/profile`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
   login: (email, password) =>
     request('/auth/login', {
       method: 'POST',

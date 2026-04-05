@@ -401,6 +401,40 @@
   margin: 0;
 }
 
+.profile-header__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.profile-header__row h1 {
+  margin: 0;
+}
+
+.profile-edit-form {
+  margin-top: 0.5rem;
+}
+
+.profile-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.profile-edit-logout {
+  margin-top: 1.25rem;
+}
+
+.form__muted {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+}
+
 .page--profile {
   max-width: 36rem;
 }

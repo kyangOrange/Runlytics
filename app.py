@@ -306,6 +306,104 @@ def create_app() -> Flask:
         profile = _row_to_profile_public(row)
         return jsonify(profile)
 
+    @app.patch("/user/<int:user_id>/profile")
+    def user_profile_patch(user_id: int):
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({"error": "Expected JSON body"}), 400
+
+        allowed = {
+            "display_name",
+            "age",
+            "biological_sex",
+            "prior_injury_same_area",
+            "equipment_bodyweight_only",
+        }
+        if not isinstance(data, dict) or not any(k in data for k in allowed):
+            return jsonify(
+                {"error": "Provide at least one of: display_name, age, biological_sex, "
+                "prior_injury_same_area, equipment_bodyweight_only"}
+            ), 400
+
+        with get_db() as conn:
+            row = conn.execute(
+                """
+                SELECT id, email, display_name, age, biological_sex,
+                       prior_injury_same_area, equipment_bodyweight_only
+                FROM users WHERE id = ?
+                """,
+                (user_id,),
+            ).fetchone()
+            if row is None:
+                return jsonify({"error": "User not found"}), 404
+
+            sets: list[str] = []
+            values: list[Any] = []
+
+            if "display_name" in data:
+                dn = data["display_name"]
+                if not isinstance(dn, str) or not dn.strip():
+                    return jsonify({"error": "display_name must be a non-empty string"}), 400
+                sets.append("display_name = ?")
+                values.append(dn.strip())
+
+            if "age" in data:
+                try:
+                    age_int = int(data["age"])
+                except (TypeError, ValueError):
+                    return jsonify({"error": "age must be an integer"}), 400
+                if age_int < 5 or age_int > 120:
+                    return jsonify({"error": "age must be between 5 and 120"}), 400
+                sets.append("age = ?")
+                values.append(age_int)
+
+            if "biological_sex" in data:
+                sex = data["biological_sex"]
+                if not isinstance(sex, str):
+                    return jsonify({"error": "biological_sex must be a string"}), 400
+                sex = sex.strip().lower()
+                if sex not in BIOLOGICAL_SEX_VALUES:
+                    return jsonify(
+                        {
+                            "error": "biological_sex must be one of: female, male, other, prefer_not_say",
+                        }
+                    ), 400
+                sets.append("biological_sex = ?")
+                values.append(sex)
+
+            if "prior_injury_same_area" in data:
+                if not isinstance(data["prior_injury_same_area"], bool):
+                    return jsonify({"error": "prior_injury_same_area must be a boolean"}), 400
+                sets.append("prior_injury_same_area = ?")
+                values.append(1 if data["prior_injury_same_area"] else 0)
+
+            if "equipment_bodyweight_only" in data:
+                if not isinstance(data["equipment_bodyweight_only"], bool):
+                    return jsonify({"error": "equipment_bodyweight_only must be a boolean"}), 400
+                sets.append("equipment_bodyweight_only = ?")
+                values.append(1 if data["equipment_bodyweight_only"] else 0)
+
+            if not sets:
+                return jsonify({"error": "No valid fields to update"}), 400
+
+            values.append(user_id)
+            conn.execute(
+                f"UPDATE users SET {', '.join(sets)} WHERE id = ?",
+                values,
+            )
+            conn.commit()
+
+            row = conn.execute(
+                """
+                SELECT id, email, display_name, age, biological_sex,
+                       prior_injury_same_area, equipment_bodyweight_only
+                FROM users WHERE id = ?
+                """,
+                (user_id,),
+            ).fetchone()
+
+        return jsonify(_row_to_profile_public(row))
+
     @app.post("/session/new")
     def session_new():
         data = request.get_json(silent=True)

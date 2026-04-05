@@ -122,6 +122,7 @@ The API allows `http://localhost:5173` and `http://127.0.0.1:5173` by default. F
 | `POST` | `/auth/signup` | Body: `email`, `password`, `display_name`, `age`, `biological_sex` (`female` \| `male` \| `other` \| `prefer_not_say`), `prior_injury_same_area`, `equipment_bodyweight_only` (booleans). Profile fields (except name/email/equipment flag for triage) adjust **starting priors** in `bayesian_engine` via `prior_modifiers.py`. |
 | `POST` | `/auth/login` | Body: `{ "email", "password" }` |
 | `GET` | `/user/<user_id>/profile` | Public profile JSON (no password hash). |
+| `PATCH` | `/user/<user_id>/profile` | Partial update: any of `display_name`, `age`, `biological_sex`, `prior_injury_same_area`, `equipment_bodyweight_only`. Returns updated profile. |
 | `POST` | `/session/new` | Body: `{ "user_id" }` — loads user row and builds engine with **profile-adjusted priors**. |
 | `GET` | `/session/<id>/next-question` | Next question or `{ "complete": true }` |
 | `POST` | `/session/<id>/answer` | Body: `{ "symptom", "answer" }` (boolean) |
