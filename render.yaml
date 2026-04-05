@@ -1,0 +1,21 @@
+# Render Blueprint — deploy the API without opening ports on your computer.
+# Dashboard: New → Blueprint → connect this repo, or paste this file.
+# After deploy: set CORS_ORIGINS in the dashboard to your frontend origin
+# (e.g. https://your-app.vercel.app). SECRET_KEY is auto-generated below.
+
+services:
+  - type: web
+    name: runlytics-api
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT app:app
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false

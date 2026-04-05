@@ -103,11 +103,18 @@ def _question_by_symptom(symptom: str) -> dict[str, Any] | None:
 
 def create_app() -> Flask:
     app = Flask(__name__)
+    # Set SECRET_KEY in your host’s environment (Render / Railway / etc.); never commit it.
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-only-not-for-public-deploy")
     CORS(
         app,
         resources={r"/*": {"origins": _cors_origins()}},
         supports_credentials=True,
     )
+
+    @app.get("/health")
+    def health():
+        """Lightweight check for uptime monitors (Render, etc.)."""
+        return jsonify({"status": "ok"})
 
     @app.post("/auth/signup")
     def signup():
