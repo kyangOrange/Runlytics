@@ -1,10 +1,31 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
 const AppStateContext = createContext(null)
 
+const USER_ID_KEY = 'runlytics_user_id'
+
+function readStoredUserId() {
+  try {
+    const raw = localStorage.getItem(USER_ID_KEY)
+    if (raw == null || raw === '') return null
+    const n = parseInt(raw, 10)
+    return Number.isNaN(n) ? null : n
+  } catch {
+    return null
+  }
+}
+
 export function AppStateProvider({ children }) {
-  const [userId, setUserId] = useState(null)
+  const [userId, setUserId] = useState(readStoredUserId)
   const [sessionId, setSessionId] = useState(null)
+
+  useEffect(() => {
+    if (userId == null) {
+      localStorage.removeItem(USER_ID_KEY)
+    } else {
+      localStorage.setItem(USER_ID_KEY, String(userId))
+    }
+  }, [userId])
 
   const value = useMemo(
     () => ({
@@ -15,6 +36,7 @@ export function AppStateProvider({ children }) {
       logout: () => {
         setUserId(null)
         setSessionId(null)
+        localStorage.removeItem(USER_ID_KEY)
       },
     }),
     [userId, sessionId],
