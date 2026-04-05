@@ -141,12 +141,10 @@ export function Profile() {
             <div className="profile-dl__row">
               <dt>Name</dt>
               <dd>{profile.display_name || '—'}</dd>
-              <dd className="profile-dl__why">Account only — not used in the algorithm.</dd>
             </div>
             <div className="profile-dl__row">
               <dt>Email</dt>
               <dd>{profile.email}</dd>
-              <dd className="profile-dl__why">Login only — not editable here.</dd>
             </div>
             <div className="profile-dl__row">
               <dt>Age</dt>
@@ -185,8 +183,8 @@ export function Profile() {
                     : '—'}
               </dd>
               <dd className="profile-dl__why">
-                For recovery calendar (coming soon): default to bodyweight exercises; equipment options
-                as upgrades. Does not change triage math today.
+                For recovery calendar (coming soon): default to bodyweight exercises; equipment options as
+                upgrades.
               </dd>
             </div>
           </dl>
@@ -213,7 +211,6 @@ export function Profile() {
               onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
               required
             />
-            <span className="form__hint">Account only — not used in the algorithm.</span>
           </label>
           <label className="form__label">
             Age

@@ -153,8 +153,8 @@ export function Signup() {
             <span>
               Prefer bodyweight-only recovery guidance (limited or no gym equipment)
               <span className="form__hint form__hint--inline">
-                For future calendar features; exercise variants will default to bodyweight. Does not
-                change triage math today.
+                For recovery calendar (coming soon): default to bodyweight exercises; equipment options as
+                upgrades.
               </span>
             </span>
           </label>
