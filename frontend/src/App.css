@@ -275,6 +275,19 @@
   flex-wrap: wrap;
 }
 
+.question-card__actions--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.question-card__option-btn {
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.35;
+  padding: 0.55rem 0.85rem;
+}
+
 .results-card {
   border-radius: var(--radius);
   padding: 1.35rem 1.25rem;

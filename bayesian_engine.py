@@ -2,6 +2,27 @@ from typing import Any
 
 from prior_modifiers import priors_from_profile
 
+# P(observed choice | condition) for multi-option symptom questions (keys = API option ids).
+CATEGORICAL_LIKELIHOODS: dict[str, dict[str, dict[str, float]]] = {
+    "warmup_response": {
+        "improves": {"shin_splints": 0.75, "stress_fracture": 0.2},
+        "stays_same": {"shin_splints": 0.4, "stress_fracture": 0.4},
+        "worsens": {"shin_splints": 0.3, "stress_fracture": 0.7},
+        "not_sure": {"shin_splints": 0.5, "stress_fracture": 0.5},
+    },
+    "delayed_pain": {
+        "yes": {"shin_splints": 0.3, "stress_fracture": 0.7},
+        "no": {"shin_splints": 0.6, "stress_fracture": 0.3},
+        "not_sure": {"shin_splints": 0.5, "stress_fracture": 0.5},
+    },
+    "pain_at_rest": {
+        "only_activity": {"shin_splints": 0.7, "stress_fracture": 0.3},
+        "sometimes_rest": {"shin_splints": 0.4, "stress_fracture": 0.6},
+        "constant_rest": {"shin_splints": 0.2, "stress_fracture": 0.8},
+        "not_sure": {"shin_splints": 0.5, "stress_fracture": 0.5},
+    },
+}
+
 
 class BayesianInferenceEngine:
     EXPERIENCE_MULTIPLIERS = {
@@ -21,25 +42,18 @@ class BayesianInferenceEngine:
 
     def __init__(self, verbose: bool = True, profile: dict[str, Any] | None = None):
         self.verbose = verbose
-        # Priors: P(condition), optionally adjusted from user profile before symptoms
         self.probabilities = dict(priors_from_profile(profile))
         exp = profile.get("running_experience") if profile else None
         self.apply_experience_prior(exp)
 
-        # Likelihoods: P(symptom | condition)
-        # Placeholder values — tune/replace with real estimates later.
+        # Binary guided diagnostics only — P(positive finding | condition)
         self.likelihoods = {
             "shin_splints": {
-                "pain_worse_with_running": 0.8,
-                "pain_at_rest": 0.2,
-                # Guided diagnostics — P(observed positive finding | condition)
                 "positive_hop_test": 0.1,
                 "point_tenderness_palpation": 0.3,
                 "pain_improves_with_warmup": 0.7,
             },
             "stress_fracture": {
-                "pain_worse_with_running": 0.7,
-                "pain_at_rest": 0.6,
                 "positive_hop_test": 0.9,
                 "point_tenderness_palpation": 0.85,
                 "pain_improves_with_warmup": 0.15,
@@ -63,10 +77,6 @@ class BayesianInferenceEngine:
         self._normalize()
 
     def update(self, symptom: str) -> None:
-        """
-        Update P(condition) given an observed symptom using Bayes rule:
-          P(c | s) ∝ P(s | c) * P(c)
-        """
         for condition, prior in list(self.probabilities.items()):
             likelihood = self._get_likelihood(condition, symptom)
             self.probabilities[condition] = likelihood * prior
@@ -86,9 +96,7 @@ class BayesianInferenceEngine:
     def apply_observation_weighted(
         self, symptom: str, positive: bool, weight: float = 1.0
     ) -> None:
-        """
-        Bayesian update with optional exponent on the likelihood ratio (weight > 1 = stronger pull).
-        """
+        """Bayesian update for binary diagnostic observations."""
         w = max(0.0, float(weight))
         for condition in list(self.probabilities.keys()):
             L = self._get_likelihood(condition, symptom)
@@ -97,6 +105,23 @@ class BayesianInferenceEngine:
             self.probabilities[condition] *= mult**w
         self._normalize()
         self._print_distribution(symptom=symptom)
+
+    def categorical_likelihood(self, condition: str, symptom: str, choice: str) -> float:
+        table = CATEGORICAL_LIKELIHOODS.get(symptom)
+        if not table:
+            return 0.5
+        row = table.get(choice)
+        if not row:
+            return 0.5
+        return float(row.get(condition, 0.5))
+
+    def apply_categorical_observation(self, symptom: str, choice: str) -> None:
+        """Update P(condition) given a categorical answer: P(c|o) ∝ P(o|c) P(c)."""
+        for condition in list(self.probabilities.keys()):
+            L = self.categorical_likelihood(condition, symptom, choice)
+            self.probabilities[condition] *= max(L, 1e-9)
+        self._normalize()
+        self._print_distribution(symptom=f"{symptom}:{choice}")
 
     def _get_likelihood(self, condition: str, symptom: str) -> float:
         if condition not in self.likelihoods:
@@ -127,6 +152,5 @@ class BayesianInferenceEngine:
 
 if __name__ == "__main__":
     engine = BayesianInferenceEngine()
-    engine.update("pain_worse_with_running")
-    engine.update("pain_at_rest")
-    engine.update("positive_hop_test")
+    engine.apply_categorical_observation("warmup_response", "improves")
+    engine.apply_categorical_observation("delayed_pain", "yes")

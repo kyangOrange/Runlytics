@@ -38,6 +38,7 @@ export function TestQuestions() {
           text: nq.text,
           symptom: nq.symptom,
           whyAsk: nq.why_ask,
+          options: nq.options ?? null,
         })
       } catch (e) {
         if (!cancelled) setError(e.message ?? 'Could not load questions')
@@ -77,6 +78,7 @@ export function TestQuestions() {
         text: nq.text,
         symptom: nq.symptom,
         whyAsk: nq.why_ask,
+        options: nq.options ?? null,
       })
     } catch (e) {
       setError(e.message ?? 'Could not save answer')
@@ -119,23 +121,45 @@ export function TestQuestions() {
             <span className="question-card__why-label">Why we ask:</span> {question.whyAsk}
           </p>
         ) : null}
-        <div className="question-card__actions">
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={answering || !question}
-            onClick={() => handleAnswer(true)}
-          >
-            Yes
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            disabled={answering || !question}
-            onClick={() => handleAnswer(false)}
-          >
-            No
-          </button>
+        <div
+          className={
+            question?.options
+              ? 'question-card__actions question-card__actions--stack'
+              : 'question-card__actions'
+          }
+        >
+          {question?.options ? (
+            Object.entries(question.options).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className="btn btn--ghost question-card__option-btn"
+                disabled={answering || !question}
+                onClick={() => handleAnswer(value)}
+              >
+                {label}
+              </button>
+            ))
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={answering || !question}
+                onClick={() => handleAnswer(true)}
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                disabled={answering || !question}
+                onClick={() => handleAnswer(false)}
+              >
+                No
+              </button>
+            </>
+          )}
         </div>
       </div>
       {error ? <p className="form__error">{error}</p> : null}

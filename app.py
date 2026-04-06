@@ -511,6 +511,8 @@ def create_app() -> Flask:
         }
         if q.get("why_ask"):
             out["why_ask"] = q["why_ask"]
+        if q.get("options"):
+            out["options"] = q["options"]
         return jsonify(out)
 
     @app.post("/session/<session_id>/answer")
@@ -529,8 +531,6 @@ def create_app() -> Flask:
         answer = data["answer"]
         if not isinstance(symptom, str) or not symptom:
             return jsonify({"error": "symptom must be a non-empty string"}), 400
-        if not isinstance(answer, bool):
-            return jsonify({"error": "answer must be a boolean"}), 400
 
         question = _question_by_symptom(symptom)
         if question is None:
@@ -538,9 +538,24 @@ def create_app() -> Flask:
         if not rec.get("training_load_submitted"):
             return jsonify({"error": "Submit training load first"}), 400
 
+        opts = question.get("options")
+        if opts:
+            if not isinstance(answer, str) or not answer.strip():
+                return jsonify({"error": "answer must be a non-empty string (choice id)"}), 400
+            choice = answer.strip()
+            if choice not in opts:
+                return jsonify({"error": "Invalid answer for this question"}), 400
+        else:
+            if not isinstance(answer, bool):
+                return jsonify({"error": "answer must be a boolean"}), 400
+            choice = answer
+
         selector: QuestionSelector = rec["selector"]
         engine: BayesianInferenceEngine = rec["engine"]
-        selector.ask_question(question, answer)
+        try:
+            selector.ask_question(question, choice)
+        except (TypeError, ValueError) as e:
+            return jsonify({"error": str(e)}), 400
 
         complete = selector.should_stop()
         return jsonify(

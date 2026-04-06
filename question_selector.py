@@ -39,23 +39,6 @@ def _likelihood(engine: BayesianInferenceEngine, condition: str, symptom: str) -
     return float(engine._get_likelihood(condition, symptom))
 
 
-def _condition_specificity(
-    engine: BayesianInferenceEngine,
-    leading_condition: str,
-    symptom: str,
-) -> float:
-    """
-    Likelihood ratio: P(symptom | leading) vs the mean of P(symptom | c) over all other c.
-    """
-    l_lead = _likelihood(engine, leading_condition, symptom)
-    others = [c for c in engine.probabilities if c != leading_condition]
-    if not others:
-        return 1.0
-    avg_other = sum(_likelihood(engine, c, symptom) for c in others) / len(others)
-    eps = 1e-9
-    return l_lead / max(avg_other, eps)
-
-
 def _posterior_after_answer(
     engine: BayesianInferenceEngine,
     base: dict[str, float],
@@ -69,6 +52,54 @@ def _posterior_after_answer(
         out[condition] = mult * prior
     _normalize(out)
     return out
+
+
+def _posterior_after_categorical(
+    engine: BayesianInferenceEngine,
+    base: dict[str, float],
+    symptom: str,
+    choice: str,
+) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for condition, prior in base.items():
+        L = engine.categorical_likelihood(condition, symptom, choice)
+        out[condition] = max(L, 1e-9) * prior
+    _normalize(out)
+    return out
+
+
+def _condition_specificity(
+    engine: BayesianInferenceEngine,
+    leading_condition: str,
+    symptom: str,
+) -> float:
+    l_lead = _likelihood(engine, leading_condition, symptom)
+    others = [c for c in engine.probabilities if c != leading_condition]
+    if not others:
+        return 1.0
+    avg_other = sum(_likelihood(engine, c, symptom) for c in others) / len(others)
+    eps = 1e-9
+    return l_lead / max(avg_other, eps)
+
+
+def _condition_specificity_categorical(
+    engine: BayesianInferenceEngine,
+    leading_condition: str,
+    question: dict[str, Any],
+) -> float:
+    symptom = str(question["symptom"])
+    options = question.get("options") or {}
+    others = [c for c in engine.probabilities if c != leading_condition]
+    if not others:
+        return 1.0
+    best = 1.0
+    for choice in options:
+        l_lead = engine.categorical_likelihood(leading_condition, symptom, choice)
+        avg_o = sum(engine.categorical_likelihood(c, symptom, choice) for c in others) / len(
+            others
+        )
+        best = max(best, l_lead / max(avg_o, 1e-9))
+    return best
 
 
 class QuestionSelector:
@@ -102,16 +133,11 @@ class QuestionSelector:
     def should_stop(self) -> bool:
         return self._is_stopped()
 
-    def expected_entropy_after_question(self, question: dict[str, Any]) -> tuple[float, float]:
-        """
-        Returns (expected_entropy_after_asking, information_gain).
-        Information gain = H(current) - E[H after answer].
-        """
+    def _expected_entropy_binary(self, question: dict[str, Any]) -> tuple[float, float]:
         symptom = self._symptom_key(question)
         base = _copy_probs(self.engine)
         h_now = _entropy(base)
 
-        # P(Yes) = sum_c P(Yes|c) P(c)
         p_yes = 0.0
         for condition, prior in base.items():
             p_yes += _likelihood(self.engine, condition, symptom) * prior
@@ -127,15 +153,34 @@ class QuestionSelector:
         ig = h_now - expected_h
         return expected_h, ig
 
+    def _expected_entropy_categorical(self, question: dict[str, Any]) -> tuple[float, float]:
+        symptom = self._symptom_key(question)
+        options = question.get("options") or {}
+        base = _copy_probs(self.engine)
+        h_now = _entropy(base)
+
+        expected_h = 0.0
+        for choice in options:
+            p_o = 0.0
+            for condition, prior in base.items():
+                p_o += self.engine.categorical_likelihood(condition, symptom, choice) * prior
+            p_o = min(1.0, max(0.0, p_o))
+            post_o = _posterior_after_categorical(self.engine, base, symptom, choice)
+            expected_h += p_o * _entropy(post_o)
+
+        ig = h_now - expected_h
+        return expected_h, ig
+
+    def expected_entropy_after_question(self, question: dict[str, Any]) -> tuple[float, float]:
+        if question.get("options"):
+            return self._expected_entropy_categorical(question)
+        return self._expected_entropy_binary(question)
+
     def get_next_question(self) -> dict[str, Any] | None:
         if self._is_stopped():
             return None
 
-        candidates = [
-            q
-            for q in self.questions
-            if self._symptom_key(q) not in self._asked
-        ]
+        candidates = [q for q in self.questions if self._symptom_key(q) not in self._asked]
         if not candidates:
             return None
 
@@ -147,20 +192,32 @@ class QuestionSelector:
         for q in candidates:
             _, ig = self.expected_entropy_after_question(q)
             symptom = self._symptom_key(q)
-            condition_specificity = _condition_specificity(
-                self.engine, leading, symptom
-            )#this is the condition specificity score
-            final_score = ig + (self.BOOST_WEIGHT * condition_specificity)
+            if q.get("options"):
+                spec = _condition_specificity_categorical(self.engine, leading, q)
+            else:
+                spec = _condition_specificity(self.engine, leading, symptom)
+            final_score = ig + (self.BOOST_WEIGHT * spec)
             if final_score > best_score:
                 best_score = final_score
                 best = q
 
         return best
 
-    def ask_question(self, question: dict[str, Any], answer: bool) -> None:
+    def ask_question(self, question: dict[str, Any], answer: bool | str) -> None:
         symptom = self._symptom_key(question)
         self._asked.add(symptom)
 
+        if question.get("options"):
+            if not isinstance(answer, str):
+                raise TypeError("categorical question requires string answer")
+            opts = question["options"]
+            if answer not in opts:
+                raise ValueError(f"invalid choice {answer!r}")
+            self.engine.apply_categorical_observation(symptom, answer)
+            return
+
+        if not isinstance(answer, bool):
+            raise TypeError("binary question requires boolean answer")
         for condition in list(self.engine.probabilities.keys()):
             L = _likelihood(self.engine, condition, symptom)
             mult = L if answer else (1.0 - L)
@@ -177,18 +234,46 @@ QUESTIONS = [
             "(once you've warmed up), or does it worsen?"
         ),
         "why_ask": (
-            "Some injuries feel better once warmed up — others get worse with more running. "
-            "This is one of the most important signals we use."
+            "Pain that improves with warm-up is often related to soft tissue irritation, while "
+            "pain that worsens with continued running may indicate a more serious load-related injury."
         ),
-        "symptom": "pain_worse_with_running",
+        "symptom": "warmup_response",
+        "options": {
+            "improves": "Improves after warming up",
+            "stays_same": "Stays about the same",
+            "worsens": "Worsens as you continue running",
+            "not_sure": "Not sure",
+        },
     },
     {
-        "text": "Is the pain present at rest or only during activity?",
+        "text": (
+            "After your runs, does the pain tend to feel worse later "
+            "(for example, later that day or the next morning)?"
+        ),
         "why_ask": (
-            "Pain that affects you when you're not running is a warning sign that this may be "
-            "more serious than a running-only issue."
+            "Pain that worsens after running — rather than during it — is an important signal "
+            "for certain types of overuse injuries."
+        ),
+        "symptom": "delayed_pain",
+        "options": {
+            "yes": "Yes — it feels worse later",
+            "no": "No — it doesn't get worse later",
+            "not_sure": "Not sure",
+        },
+    },
+    {
+        "text": "Is the pain present when you're at rest, or only when you're running or active?",
+        "why_ask": (
+            "Pain that is present even at rest can be a warning sign of a more serious injury, "
+            "while pain only during activity is often less severe."
         ),
         "symptom": "pain_at_rest",
+        "options": {
+            "only_activity": "Only during running or activity",
+            "sometimes_rest": "Sometimes present at rest",
+            "constant_rest": "Present even at rest most of the time",
+            "not_sure": "Not sure",
+        },
     },
 ]
 
@@ -201,7 +286,6 @@ if __name__ == "__main__":
         q = selector.get_next_question()
         if q is None:
             break
-        print(f"Next question (by information gain): {q['text']}")
-        # Demo: alternate yes/no — replace with real user input in the app
-        demo_answer = True
-        selector.ask_question(q, demo_answer)
+        print(f"Next question: {q['text']}")
+        first_choice = next(iter(q["options"]))
+        selector.ask_question(q, first_choice)
