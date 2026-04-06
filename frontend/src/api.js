@@ -48,4 +48,14 @@ export const api = {
       body: JSON.stringify({ symptom, answer }),
     }),
   triage: (sessionId) => request(`/session/${sessionId}/triage`),
+  postTrainingLoad: (sessionId, body) =>
+    request(`/session/${sessionId}/training-load`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  postDiagnostic: (sessionId, body) =>
+    request(`/session/${sessionId}/diagnostic`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 }

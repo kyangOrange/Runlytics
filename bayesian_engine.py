@@ -33,11 +33,17 @@ class BayesianInferenceEngine:
                 "pain_worse_with_running": 0.8,
                 "pain_at_rest": 0.2,
                 "positive_hop_test": 0.1,
+                "diag_single_leg_hop": 0.2,
+                "diag_shin_palpation": 0.45,
+                "diag_morning_stiffness_severe": 0.3,
             },
             "stress_fracture": {
                 "pain_worse_with_running": 0.7,
                 "pain_at_rest": 0.6,
                 "positive_hop_test": 0.9,
+                "diag_single_leg_hop": 0.82,
+                "diag_shin_palpation": 0.78,
+                "diag_morning_stiffness_severe": 0.65,
             },
         }
 
@@ -66,6 +72,30 @@ class BayesianInferenceEngine:
             likelihood = self._get_likelihood(condition, symptom)
             self.probabilities[condition] = likelihood * prior
 
+        self._normalize()
+        self._print_distribution(symptom=symptom)
+
+    def apply_acwr_risk_to_priors(self, risk: float) -> None:
+        """Placeholder: nudge probabilities using synthetic load risk in [0, 1]."""
+        r = max(0.0, min(1.0, float(risk)))
+        if "stress_fracture" in self.probabilities:
+            self.probabilities["stress_fracture"] *= 1.0 + 0.28 * r
+        if "shin_splints" in self.probabilities:
+            self.probabilities["shin_splints"] *= 1.0 + 0.12 * r
+        self._normalize()
+
+    def apply_observation_weighted(
+        self, symptom: str, positive: bool, weight: float = 1.0
+    ) -> None:
+        """
+        Bayesian update with optional exponent on the likelihood ratio (weight > 1 = stronger pull).
+        """
+        w = max(0.0, float(weight))
+        for condition in list(self.probabilities.keys()):
+            L = self._get_likelihood(condition, symptom)
+            mult = L if positive else (1.0 - L)
+            mult = max(mult, 1e-9)
+            self.probabilities[condition] *= mult**w
         self._normalize()
         self._print_distribution(symptom=symptom)
 

@@ -15,11 +15,24 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from bayesian_engine import BayesianInferenceEngine
 from question_selector import QUESTIONS, QuestionSelector
+from scoring import (
+    placeholder_acwr_risk,
+    triage_from_severity,
+    validate_training_load_body,
+)
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = os.path.join(_BASE_DIR, os.environ.get("DATABASE_NAME", "runlytics.db"))
 
 SESSIONS: dict[str, dict[str, Any]] = {}
+
+# Maps API test_id -> engine likelihood key (placeholder guided tests)
+DIAGNOSTIC_SYMPTOM_KEYS: dict[str, str] = {
+    "hop_single_leg": "diag_single_leg_hop",
+    "shin_bone_palpation": "diag_shin_palpation",
+    "morning_stiffness_first_steps": "diag_morning_stiffness_severe",
+}
+DIAGNOSTIC_LIKELIHOOD_WEIGHT = 2.0
 
 BIOLOGICAL_SEX_VALUES = frozenset({"female", "male", "other", "prefer_not_say"})
 RUNNING_EXPERIENCE_VALUES = frozenset({"beginner", "intermediate", "experienced"})
@@ -123,41 +136,6 @@ def _row_to_profile_public(row: sqlite3.Row) -> dict[str, Any] | None:
 
 def _probabilities_payload(engine: BayesianInferenceEngine) -> dict[str, float]:
     return dict(engine.probabilities)
-
-
-def _triage_from_probs(probabilities: dict[str, float]) -> dict[str, Any]:
-    if not probabilities:
-        return {
-            "leading_condition": None,
-            "leading_probability": 0.0,
-            "confidence_tier": "low",
-            "recommendation": "Low confidence — insufficient data; triage uncertain.",
-        }
-    leading, p = max(probabilities.items(), key=lambda kv: kv[1])
-    if p > 0.8:
-        tier = "high"
-        recommendation = (
-            f"High confidence triage: leading hypothesis is {leading} "
-            f"({p:.0%}). Seek appropriate care if symptoms worsen."
-        )
-    elif p >= 0.6:
-        tier = "moderate"
-        recommendation = (
-            f"Moderate confidence: {leading} is the leading hypothesis ({p:.0%}). "
-            "Consider follow-up and monitoring."
-        )
-    else:
-        tier = "low"
-        recommendation = (
-            f"Low confidence — triage uncertain. Leading hypothesis is {leading} "
-            f"({p:.0%}); further assessment recommended."
-        )
-    return {
-        "leading_condition": leading,
-        "leading_probability": p,
-        "confidence_tier": tier,
-        "recommendation": recommendation,
-    }
 
 
 def _question_by_symptom(symptom: str) -> dict[str, Any] | None:
@@ -494,6 +472,8 @@ def create_app() -> Flask:
             "user_id": user_id,
             "engine": engine,
             "selector": selector,
+            "acwr_risk_score": None,
+            "training_load_submitted": False,
         }
 
         return jsonify(
@@ -508,6 +488,8 @@ def create_app() -> Flask:
         rec = SESSIONS.get(session_id)
         if rec is None:
             return jsonify({"error": "Session not found"}), 404
+        if not rec.get("training_load_submitted"):
+            return jsonify({"error": "Submit training load (POST .../training-load) first"}), 400
 
         selector: QuestionSelector = rec["selector"]
         if selector.should_stop():
@@ -524,8 +506,6 @@ def create_app() -> Flask:
         }
         if q.get("why_ask"):
             out["why_ask"] = q["why_ask"]
-        if q.get("answer_guide"):
-            out["answer_guide"] = q["answer_guide"]
         return jsonify(out)
 
     @app.post("/session/<session_id>/answer")
@@ -550,6 +530,8 @@ def create_app() -> Flask:
         question = _question_by_symptom(symptom)
         if question is None:
             return jsonify({"error": "Unknown symptom"}), 400
+        if not rec.get("training_load_submitted"):
+            return jsonify({"error": "Submit training load first"}), 400
 
         selector: QuestionSelector = rec["selector"]
         engine: BayesianInferenceEngine = rec["engine"]
@@ -563,6 +545,72 @@ def create_app() -> Flask:
             }
         )
 
+    @app.post("/session/<session_id>/training-load")
+    def session_training_load(session_id: str):
+        rec = SESSIONS.get(session_id)
+        if rec is None:
+            return jsonify({"error": "Session not found"}), 404
+        if rec.get("training_load_submitted"):
+            return jsonify({"error": "Training load already submitted for this session"}), 400
+
+        data = request.get_json(silent=True)
+        ok, err = validate_training_load_body(data or {})
+        if not ok:
+            return jsonify({"error": err}), 400
+
+        answers_norm = {
+            "weekly_volume_trend": str(data["weekly_volume_trend"]).strip().lower(),
+            "volume_last_7_vs_usual": str(data["volume_last_7_vs_usual"]).strip().lower(),
+            "hard_sessions_last_week": str(data["hard_sessions_last_week"]).strip().lower(),
+            "sudden_training_change": str(data["sudden_training_change"]).strip().lower(),
+        }
+        risk = placeholder_acwr_risk(answers_norm)
+
+        engine: BayesianInferenceEngine = rec["engine"]
+        engine.apply_acwr_risk_to_priors(risk)
+        rec["acwr_risk_score"] = risk
+        rec["training_load_submitted"] = True
+
+        return jsonify(
+            {
+                "acwr_risk_score": risk,
+                "probabilities": _probabilities_payload(engine),
+            }
+        )
+
+    @app.post("/session/<session_id>/diagnostic")
+    def session_diagnostic(session_id: str):
+        rec = SESSIONS.get(session_id)
+        if rec is None:
+            return jsonify({"error": "Session not found"}), 404
+
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({"error": "Expected JSON body"}), 400
+        if "test_id" not in data or "positive" not in data:
+            return jsonify({"error": "Missing test_id or positive"}), 400
+
+        test_id = data["test_id"]
+        positive = data["positive"]
+        if not isinstance(test_id, str) or not test_id.strip():
+            return jsonify({"error": "test_id must be a non-empty string"}), 400
+        if not isinstance(positive, bool):
+            return jsonify({"error": "positive must be a boolean"}), 400
+
+        tid = test_id.strip()
+        symptom_key = DIAGNOSTIC_SYMPTOM_KEYS.get(tid)
+        if symptom_key is None:
+            return jsonify({"error": "Unknown test_id"}), 400
+
+        engine: BayesianInferenceEngine = rec["engine"]
+        engine.apply_observation_weighted(
+            symptom_key,
+            positive,
+            DIAGNOSTIC_LIKELIHOOD_WEIGHT,
+        )
+
+        return jsonify({"probabilities": _probabilities_payload(engine)})
+
     @app.get("/session/<session_id>/triage")
     def session_triage(session_id: str):
         rec = SESSIONS.get(session_id)
@@ -571,7 +619,8 @@ def create_app() -> Flask:
 
         engine: BayesianInferenceEngine = rec["engine"]
         probabilities = _probabilities_payload(engine)
-        triage = _triage_from_probs(probabilities)
+        acwr = rec.get("acwr_risk_score")
+        triage = triage_from_severity(probabilities, acwr if isinstance(acwr, (int, float)) else None)
 
         return jsonify(
             {

@@ -180,10 +180,6 @@ QUESTIONS = [
             "Some injuries feel better once warmed up — others get worse with more running. "
             "This is one of the most important signals we use."
         ),
-        "answer_guide": (
-            "Answer Yes if the pain typically worsens after you've warmed up and keep running; "
-            "No if it improves or stays about the same."
-        ),
         "symptom": "pain_worse_with_running",
     },
     {
@@ -191,9 +187,6 @@ QUESTIONS = [
         "why_ask": (
             "Pain that affects you when you're not running is a warning sign that this may be "
             "more serious than a running-only issue."
-        ),
-        "answer_guide": (
-            "Answer Yes if you have pain at rest too; No if pain happens only during activity."
         ),
         "symptom": "pain_at_rest",
     },

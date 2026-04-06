@@ -5,7 +5,7 @@ import { useAppState } from '../context/AppStateContext'
 import { ProbabilityChart } from '../components/ProbabilityChart'
 
 export function TestQuestions() {
-  const { userId, sessionId, setSessionId } = useAppState()
+  const { userId, sessionId } = useAppState()
   const navigate = useNavigate()
   const [probabilities, setProbabilities] = useState({})
   const [question, setQuestion] = useState(null)
@@ -22,24 +22,23 @@ export function TestQuestions() {
       setError('')
       setLoading(true)
       try {
-        const session = await api.sessionNew(userId)
-        if (cancelled) return
-        setSessionId(session.session_id)
-        setProbabilities(session.probabilities ?? {})
-        const nq = await api.nextQuestion(session.session_id)
+        if (!sessionId) {
+          if (!cancelled) navigate('/test/intake', { replace: true })
+          return
+        }
+        const nq = await api.nextQuestion(sessionId)
         if (cancelled) return
         if (nq.complete) {
-          navigate('/test/results', { replace: true })
+          navigate('/test/diagnostics', { replace: true })
           return
         }
         setQuestion({
           text: nq.text,
           symptom: nq.symptom,
           whyAsk: nq.why_ask,
-          answerGuide: nq.answer_guide,
         })
       } catch (e) {
-        if (!cancelled) setError(e.message ?? 'Could not start session')
+        if (!cancelled) setError(e.message ?? 'Could not load questions')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -49,7 +48,7 @@ export function TestQuestions() {
     return () => {
       cancelled = true
     }
-  }, [userId, setSessionId, navigate])
+  }, [userId, sessionId, navigate])
 
   async function handleAnswer(answer) {
     if (!sessionId || !question) return
@@ -59,19 +58,18 @@ export function TestQuestions() {
       const res = await api.answer(sessionId, question.symptom, answer)
       setProbabilities(res.probabilities ?? {})
       if (res.complete) {
-        navigate('/test/results', { replace: true })
+        navigate('/test/diagnostics', { replace: true })
         return
       }
       const nq = await api.nextQuestion(sessionId)
       if (nq.complete) {
-        navigate('/test/results', { replace: true })
+        navigate('/test/diagnostics', { replace: true })
         return
       }
       setQuestion({
         text: nq.text,
         symptom: nq.symptom,
         whyAsk: nq.why_ask,
-        answerGuide: nq.answer_guide,
       })
     } catch (e) {
       setError(e.message ?? 'Could not save answer')
@@ -83,7 +81,7 @@ export function TestQuestions() {
   if (loading) {
     return (
       <div className="page">
-        <p className="page__sub">Starting diagnostic session…</p>
+        <p className="page__sub">Loading questions…</p>
       </div>
     )
   }
@@ -109,9 +107,6 @@ export function TestQuestions() {
           <p className="question-card__why">
             <span className="question-card__why-label">Why we ask:</span> {question.whyAsk}
           </p>
-        ) : null}
-        {question?.answerGuide ? (
-          <p className="question-card__guide">{question.answerGuide}</p>
         ) : null}
         <div className="question-card__actions">
           <button

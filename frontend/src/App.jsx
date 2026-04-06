@@ -6,6 +6,7 @@ import { Signup } from './pages/Signup'
 import { Home } from './pages/Home'
 import { TestIntake } from './pages/TestIntake'
 import { TestQuestions } from './pages/TestQuestions'
+import { TestDiagnostics } from './pages/TestDiagnostics'
 import { TestResults } from './pages/TestResults'
 import { Profile } from './pages/Profile'
 import './App.css'
@@ -50,6 +51,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <TestQuestions />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/test/diagnostics"
+        element={
+          <ProtectedRoute>
+            <TestDiagnostics />
           </ProtectedRoute>
         }
       />

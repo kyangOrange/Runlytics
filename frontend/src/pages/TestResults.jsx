@@ -90,9 +90,21 @@ export function TestResults() {
             <dd>{formatCondition(data.leading_condition)}</dd>
           </div>
           <div>
-            <dt>Estimated probability</dt>
+            <dt>Posterior (leading hypothesis)</dt>
             <dd>{pct(data.leading_probability)}</dd>
           </div>
+          {typeof data.severity_score === 'number' ? (
+            <div>
+              <dt>Severity score (placeholder)</dt>
+              <dd>{pct(data.severity_score)}</dd>
+            </div>
+          ) : null}
+          {typeof data.acwr_risk_score === 'number' ? (
+            <div>
+              <dt>Load risk index (placeholder)</dt>
+              <dd>{pct(data.acwr_risk_score)}</dd>
+            </div>
+          ) : null}
           <div>
             <dt>Confidence</dt>
             <dd className="results-card__tier">{tier}</dd>
