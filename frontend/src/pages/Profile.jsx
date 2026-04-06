@@ -134,8 +134,8 @@ export function Profile() {
       {profile && !editing ? (
         <>
           <p className="page__sub">
-            What you saved for your account. Model-related fields adjust starting probabilities before
-            symptom questions on each <strong>new</strong> test.
+            Your account details. Use <strong>Edit</strong> to update anything—changes apply the next time
+            you start a new assessment.
           </p>
           <dl className="profile-dl">
             <div className="profile-dl__row">
@@ -197,8 +197,7 @@ export function Profile() {
       {profile && editing && form ? (
         <form className="form profile-edit-form" onSubmit={saveEdit}>
           <p className="page__sub">
-            Email cannot be changed here. Saving updates your stored profile; new diagnostic sessions use
-            the updated priors.
+            Email can't be changed here. When you save, we’ll update your profile for your next assessment.
           </p>
           <p className="form__muted">
             <strong>Email:</strong> {profile.email}
