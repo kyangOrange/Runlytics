@@ -238,10 +238,11 @@ QUESTIONS = [
             "pain that worsens with continued running may indicate a more serious load-related injury."
         ),
         "symptom": "warmup_response",
+        # Order: improves, worsens, stays_same (second-to-last), not_sure (last)
         "options": {
             "improves": "Improves after warming up",
-            "stays_same": "Stays about the same",
             "worsens": "Worsens as you continue running",
+            "stays_same": "Stays about the same",
             "not_sure": "Not sure",
         },
     },

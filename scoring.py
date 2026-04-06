@@ -14,7 +14,8 @@ TRAINING_LOAD_KEYS = (
     "volume_this_week_vs_usual",
     "longest_run_vs_recent_max",
     "recent_running_trend",
-    "surface_change_recent",
+    "surface_changed",
+    "surface_change_types",
 )
 
 _TRAINING_VALUE_SETS: dict[str, frozenset[str]] = {
@@ -46,13 +47,19 @@ _TRAINING_VALUE_SETS: dict[str, frozenset[str]] = {
             "not_sure",
         }
     ),
-    "surface_change_recent": frozenset(
+    "surface_changed": frozenset(
         {
-            "no_change",
+            "no",
+            "yes",
+            "not_sure",
+        }
+    ),
+    "surface_change_types": frozenset(
+        {
             "harder_surfaces",
             "more_uneven",
             "inconsistent_surfaces",
-            "not_sure",
+            "",
         }
     ),
 }
@@ -65,11 +72,31 @@ def validate_training_load_body(data: dict[str, Any]) -> tuple[bool, str]:
         if key not in data:
             return False, f"Missing field: {key}"
         val = data[key]
-        if not isinstance(val, str) or not val.strip():
-            return False, f"{key} must be a non-empty string"
+        if not isinstance(val, str):
+            return False, f"{key} must be a string"
         v = val.strip().lower()
+
+        if key == "surface_change_types":
+            # Comma-separated list (multi-select). Empty string is allowed unless surface_changed == yes.
+            parts = [p.strip() for p in v.split(",") if p.strip()]
+            for p in parts:
+                if p not in _TRAINING_VALUE_SETS[key]:
+                    return False, f"Invalid value for {key}"
+            continue
+
+        if not v:
+            return False, f"{key} must be a non-empty string"
         if v not in _TRAINING_VALUE_SETS[key]:
             return False, f"Invalid value for {key}"
+
+    if data.get("surface_changed", "").strip().lower() == "yes":
+        parts = [
+            p.strip()
+            for p in str(data.get("surface_change_types", "")).strip().lower().split(",")
+            if p.strip()
+        ]
+        if not parts:
+            return False, "Pick at least one surface change type"
     return True, ""
 
 
@@ -84,7 +111,8 @@ def placeholder_acwr_risk(answers: dict[str, str]) -> float:
     vol = answers.get("volume_this_week_vs_usual", "").lower()
     longest = answers.get("longest_run_vs_recent_max", "").lower()
     trend = answers.get("recent_running_trend", "").lower()
-    surface = answers.get("surface_change_recent", "").lower()
+    surface_changed = answers.get("surface_changed", "").lower()
+    surface_types = answers.get("surface_change_types", "").lower()
 
     # Q1 — baseline frequency (mild contextual nudge)
     if days == "every_day":
@@ -124,14 +152,16 @@ def placeholder_acwr_risk(answers: dict[str, str]) -> float:
     elif trend == "not_sure":
         score += 0.02
 
-    # Q5 — surfaces
-    if surface == "harder_surfaces":
-        score += 0.11
-    elif surface == "more_uneven":
-        score += 0.09
-    elif surface == "inconsistent_surfaces":
-        score += 0.11
-    elif surface == "not_sure":
+    # Q5 — surfaces (multi-select details only count if they said "yes")
+    if surface_changed == "yes":
+        parts = [p.strip() for p in surface_types.split(",") if p.strip()]
+        if "harder_surfaces" in parts:
+            score += 0.11
+        if "more_uneven" in parts:
+            score += 0.09
+        if "inconsistent_surfaces" in parts:
+            score += 0.11
+    elif surface_changed == "not_sure":
         score += 0.02
 
     return max(0.0, min(1.0, score))

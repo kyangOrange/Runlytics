@@ -3,13 +3,35 @@ const LABELS = {
   stress_fracture: 'Stress fracture',
 }
 
+const CONDITION_ORDER = ['shin_splints', 'stress_fracture']
+
 function pct(n) {
   if (typeof n !== 'number' || Number.isNaN(n)) return 0
   return Math.round(n * 1000) / 10
 }
 
+function orderedEntries(probabilities) {
+  const p = probabilities && typeof probabilities === 'object' ? probabilities : {}
+  const seen = new Set()
+  const out = []
+
+  for (const k of CONDITION_ORDER) {
+    if (k in p) {
+      out.push([k, p[k]])
+      seen.add(k)
+    }
+  }
+
+  for (const k of Object.keys(p).sort()) {
+    if (!seen.has(k)) out.push([k, p[k]])
+  }
+
+  return out
+}
+
 export function ProbabilityChart({ probabilities }) {
-  const entries = Object.entries(probabilities || {}).sort((a, b) => b[1] - a[1])
+  // Keep the rows in a stable order; don’t reorder when the leader changes.
+  const entries = orderedEntries(probabilities)
 
   return (
     <div className="probability-chart">

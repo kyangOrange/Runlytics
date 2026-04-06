@@ -20,8 +20,8 @@ export const TRAINING_LOAD_FIELDS = [
     whyAsk:
       'Weekly volume is a core part of training load. Research consistently links sharp increases versus your own usual week to higher overuse injury risk — so we compare this week to what is normal for you, not to other runners.',
     options: [
-      { value: 'less_or_same', label: 'Less than usual or about the same as usual' },
-      { value: 'bit_more', label: 'A bit more than usual (increase of 10% or less)' },
+      { value: 'less_or_same', label: 'Less than usual or roughly the same as usual' },
+      { value: 'bit_more', label: 'Slightly more than usual (increase of 10% or less)' },
       { value: 'significantly_more', label: 'Significantly more than usual (increase of over 10%)' },
       { value: 'not_sure', label: 'Not sure' },
     ],
@@ -32,8 +32,11 @@ export const TRAINING_LOAD_FIELDS = [
     whyAsk:
       'Research shows that doing a single run significantly longer than your recent longest run is one of the strongest predictors of overuse injury — often more than small weekly mileage increases alone. This question targets that spike.',
     options: [
-      { value: 'same_or_shorter', label: 'About the same length or shorter' },
-      { value: 'little_longer', label: 'A little longer than my usual longest run (increase of 10% or less)' },
+      { value: 'same_or_shorter', label: 'Shorter than usual or roughly the same as usual' },
+      {
+        value: 'little_longer',
+        label: 'Slightly longer than my usual longest run (increase of 10% or less)',
+      },
       {
         value: 'significantly_longer',
         label: 'Significantly more than my usual longest run (increase of over 10%)',
@@ -58,20 +61,36 @@ export const TRAINING_LOAD_FIELDS = [
     ],
   },
   {
-    key: 'surface_change_recent',
+    key: 'surface_changed',
     label: 'Have you changed the type of surfaces you run on recently?',
     whyAsk:
       'Harder surfaces (like concrete), uneven ground, or frequent switching can change impact and how your legs absorb load. If that changed at the same time as mileage or long-run length, combined stress can be higher — so we ask about surfaces on its own.',
     options: [
-      { value: 'no_change', label: 'No — I’ve been running on the same types of surfaces as usual' },
-      { value: 'harder_surfaces', label: 'Yes — I’ve been running on harder surfaces (like concrete or pavement) more than usual' },
+      { value: 'no', label: 'No — I’ve been running on the same types of surfaces as usual' },
+      { value: 'yes', label: 'Yes' },
+      { value: 'not_sure', label: 'Not sure' },
+    ],
+  },
+  {
+    key: 'surface_change_types',
+    label: 'If yes, how did it change? (Select all that apply)',
+    dependsOn: { key: 'surface_changed', value: 'yes' },
+    multi: true,
+    options: [
+      {
+        value: 'harder_surfaces',
+        label:
+          'Yes — I’ve been running on harder surfaces (like concrete or pavement) more than usual',
+      },
       {
         value: 'more_uneven',
         label:
           'Yes — I’ve been running on more uneven ground (like hills or natural trails) than usual',
       },
-      { value: 'inconsistent_surfaces', label: 'Yes — I’ve been switching between different surfaces inconsistently' },
-      { value: 'not_sure', label: 'Not sure' },
+      {
+        value: 'inconsistent_surfaces',
+        label: 'Yes — I’ve been switching between different surfaces inconsistently',
+      },
     ],
   },
 ]

@@ -9,8 +9,10 @@ export function TestDiagnostics() {
   const { sessionId, sessionProbabilities, setSessionProbabilities } = useAppState()
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
+  const [selected, setSelected] = useState(null)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
 
   const current = DIAGNOSTIC_STEPS[step]
 
@@ -24,14 +26,42 @@ export function TestDiagnostics() {
     return null
   }
 
-  async function submitDiagnostic(positive) {
+  useEffect(() => {
+    if (!sessionId || !current || selected == null) return
+    let cancelled = false
+
+    async function run() {
+      setPreviewing(true)
+      try {
+        const res = await api.previewDiagnostic(sessionId, {
+          test_id: current.testId,
+          positive: selected,
+        })
+        if (!cancelled && res?.probabilities) {
+          setSessionProbabilities(res.probabilities)
+        }
+      } catch {
+        // Best-effort preview
+      } finally {
+        if (!cancelled) setPreviewing(false)
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [selected, sessionId, current?.testId, setSessionProbabilities])
+
+  async function submitDiagnostic() {
     if (!current) return
+    if (selected == null) return
     setSubmitting(true)
     setError('')
     try {
       const res = await api.postDiagnostic(sessionId, {
         test_id: current.testId,
-        positive,
+        positive: selected,
       })
       if (res.probabilities) {
         setSessionProbabilities(res.probabilities)
@@ -42,6 +72,7 @@ export function TestDiagnostics() {
         return
       }
       setStep(next)
+      setSelected(null)
     } catch (e) {
       setError(e.message ?? 'Could not record result')
     } finally {
@@ -79,18 +110,30 @@ export function TestDiagnostics() {
             <button
               type="button"
               className="btn btn--primary"
-              disabled={submitting}
-              onClick={() => submitDiagnostic(true)}
+              disabled={submitting || previewing}
+              aria-pressed={selected === true}
+              onClick={() => setSelected(true)}
             >
               {current.yesLabel ?? 'Yes'}
             </button>
             <button
               type="button"
               className="btn btn--ghost"
-              disabled={submitting}
-              onClick={() => submitDiagnostic(false)}
+              disabled={submitting || previewing}
+              aria-pressed={selected === false}
+              onClick={() => setSelected(false)}
             >
               {current.noLabel ?? 'No'}
+            </button>
+          </div>
+          <div className="question-card__actions question-card__actions--footer">
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={submitting || selected == null}
+              onClick={submitDiagnostic}
+            >
+              {submitting ? 'Saving…' : 'Next'}
             </button>
           </div>
           {current.source ? <p className="diagnostic-card__source">{current.source}</p> : null}

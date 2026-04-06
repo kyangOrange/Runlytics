@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { Home } from './pages/Home'
+import { TestAnatomySelector } from './pages/TestAnatomySelector'
 import { TestIntake } from './pages/TestIntake'
 import { TestQuestions } from './pages/TestQuestions'
 import { TestDiagnostics } from './pages/TestDiagnostics'
@@ -35,6 +36,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/test/anatomy"
+        element={
+          <ProtectedRoute>
+            <TestAnatomySelector />
           </ProtectedRoute>
         }
       />

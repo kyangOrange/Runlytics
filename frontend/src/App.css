@@ -163,6 +163,16 @@
   background: #f0f2f5;
 }
 
+.btn[aria-pressed='true'] {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.btn[aria-pressed='true']:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.16);
+}
+
 .btn--large {
   padding: 0.85rem 1.25rem;
   font-size: 1rem;
@@ -278,6 +288,11 @@
 .question-card__actions--stack {
   flex-direction: column;
   align-items: stretch;
+}
+
+.question-card__actions--footer {
+  margin-top: 1rem;
+  justify-content: flex-end;
 }
 
 .question-card__option-btn {

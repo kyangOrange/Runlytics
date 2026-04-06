@@ -139,6 +139,75 @@ def _probabilities_payload(engine: BayesianInferenceEngine) -> dict[str, float]:
     return dict(engine.probabilities)
 
 
+def _normalize_probabilities(probs: dict[str, float]) -> dict[str, float]:
+    total = sum(float(v) for v in probs.values())
+    if total <= 0.0:
+        n = len(probs) or 1
+        return {k: 1.0 / n for k in probs}
+    return {k: float(v) / total for k, v in probs.items()}
+
+
+def _acwr_adjusted_probabilities(
+    base: dict[str, float],
+    risk: float,
+) -> dict[str, float]:
+    """
+    Mirror `BayesianInferenceEngine.apply_acwr_risk_to_priors`, but without mutating the session engine.
+    """
+    r = max(0.0, min(1.0, float(risk)))
+    probs = dict(base)
+    if "stress_fracture" in probs:
+        probs["stress_fracture"] *= 1.0 + 0.28 * r
+    if "shin_splints" in probs:
+        probs["shin_splints"] *= 1.0 + 0.12 * r
+    return _normalize_probabilities(probs)
+
+
+def _posterior_after_answer_preview(
+    engine: BayesianInferenceEngine,
+    symptom: str,
+    answer: bool | str,
+    options: dict[str, str] | None,
+) -> dict[str, float]:
+    """
+    Compute a posterior preview for a single answer without mutating the engine.
+    - If options is present, answer must be a choice id and we use categorical likelihoods.
+    - Otherwise answer must be boolean and we use binary likelihoods.
+    """
+    base = dict(engine.probabilities)
+    out: dict[str, float] = {}
+    if options:
+        choice = str(answer)
+        for condition, prior in base.items():
+            L = engine.categorical_likelihood(condition, symptom, choice)
+            out[condition] = max(float(L), 1e-9) * float(prior)
+        return _normalize_probabilities(out)
+
+    positive = bool(answer)
+    for condition, prior in base.items():
+        L = engine._get_likelihood(condition, symptom)
+        mult = float(L) if positive else (1.0 - float(L))
+        out[condition] = max(mult, 1e-9) * float(prior)
+    return _normalize_probabilities(out)
+
+
+def _posterior_after_diagnostic_preview(
+    engine: BayesianInferenceEngine,
+    symptom_key: str,
+    positive: bool,
+    weight: float,
+) -> dict[str, float]:
+    base = dict(engine.probabilities)
+    out: dict[str, float] = {}
+    w = max(0.0, float(weight))
+    for condition, prior in base.items():
+        L = float(engine._get_likelihood(condition, symptom_key))
+        mult = L if positive else (1.0 - L)
+        mult = max(mult, 1e-9)
+        out[condition] = float(prior) * (mult**w)
+    return _normalize_probabilities(out)
+
+
 def _question_by_symptom(symptom: str) -> dict[str, Any] | None:
     for q in QUESTIONS:
         if q.get("symptom") == symptom:
@@ -565,6 +634,47 @@ def create_app() -> Flask:
             }
         )
 
+    @app.post("/session/<session_id>/answer/preview")
+    def session_answer_preview(session_id: str):
+        """Preview posterior after an answer, without mutating the session engine/selector."""
+        rec = SESSIONS.get(session_id)
+        if rec is None:
+            return jsonify({"error": "Session not found"}), 404
+
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({"error": "Expected JSON body"}), 400
+        if "symptom" not in data or "answer" not in data:
+            return jsonify({"error": "Missing symptom or answer"}), 400
+
+        symptom = data["symptom"]
+        answer = data["answer"]
+        if not isinstance(symptom, str) or not symptom:
+            return jsonify({"error": "symptom must be a non-empty string"}), 400
+
+        question = _question_by_symptom(symptom)
+        if question is None:
+            return jsonify({"error": "Unknown symptom"}), 400
+        if not rec.get("training_load_submitted"):
+            return jsonify({"error": "Submit training load first"}), 400
+
+        opts = question.get("options")
+        if opts:
+            if not isinstance(answer, str) or not answer.strip():
+                return jsonify({"error": "answer must be a non-empty string (choice id)"}), 400
+            choice = answer.strip()
+            if choice not in opts:
+                return jsonify({"error": "Invalid answer for this question"}), 400
+            normalized_answer: bool | str = choice
+        else:
+            if not isinstance(answer, bool):
+                return jsonify({"error": "answer must be a boolean"}), 400
+            normalized_answer = answer
+
+        engine: BayesianInferenceEngine = rec["engine"]
+        probs = _posterior_after_answer_preview(engine, symptom, normalized_answer, opts)
+        return jsonify({"probabilities": probs})
+
     @app.post("/session/<session_id>/training-load")
     def session_training_load(session_id: str):
         rec = SESSIONS.get(session_id)
@@ -578,7 +688,13 @@ def create_app() -> Flask:
         if not ok:
             return jsonify({"error": err}), 400
 
-        answers_norm = {k: str(data[k]).strip().lower() for k in TRAINING_LOAD_KEYS}
+        answers_norm = {}
+        for k in TRAINING_LOAD_KEYS:
+            v = data.get(k, "")
+            # surface_change_types can be a list from the client; accept and join.
+            if k == "surface_change_types" and isinstance(v, list):
+                v = ",".join(str(x) for x in v)
+            answers_norm[k] = str(v).strip().lower()
         risk = placeholder_acwr_risk(answers_norm)
 
         engine: BayesianInferenceEngine = rec["engine"]
@@ -590,6 +706,38 @@ def create_app() -> Flask:
             {
                 "acwr_risk_score": risk,
                 "probabilities": _probabilities_payload(engine),
+            }
+        )
+
+    @app.post("/session/<session_id>/training-load/preview")
+    def session_training_load_preview(session_id: str):
+        """
+        Preview how the training-load answers would adjust priors, without mutating the session
+        or marking training_load_submitted. Used for live-updating the chart as users click options.
+        """
+        rec = SESSIONS.get(session_id)
+        if rec is None:
+            return jsonify({"error": "Session not found"}), 404
+
+        data = request.get_json(silent=True)
+        ok, err = validate_training_load_body(data or {})
+        if not ok:
+            return jsonify({"error": err}), 400
+
+        answers_norm: dict[str, str] = {}
+        for k in TRAINING_LOAD_KEYS:
+            v = (data or {}).get(k, "")
+            if k == "surface_change_types" and isinstance(v, list):
+                v = ",".join(str(x) for x in v)
+            answers_norm[k] = str(v).strip().lower()
+
+        risk = placeholder_acwr_risk(answers_norm)
+        engine: BayesianInferenceEngine = rec["engine"]
+        base = _probabilities_payload(engine)
+        return jsonify(
+            {
+                "acwr_risk_score": risk,
+                "probabilities": _acwr_adjusted_probabilities(base, risk),
             }
         )
 
@@ -625,6 +773,36 @@ def create_app() -> Flask:
         )
 
         return jsonify({"probabilities": _probabilities_payload(engine)})
+
+    @app.post("/session/<session_id>/diagnostic/preview")
+    def session_diagnostic_preview(session_id: str):
+        """Preview posterior after a guided test answer, without mutating the engine."""
+        rec = SESSIONS.get(session_id)
+        if rec is None:
+            return jsonify({"error": "Session not found"}), 404
+
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({"error": "Expected JSON body"}), 400
+        if "test_id" not in data or "positive" not in data:
+            return jsonify({"error": "Missing test_id or positive"}), 400
+
+        test_id = data["test_id"]
+        positive = data["positive"]
+        if not isinstance(test_id, str) or not test_id.strip():
+            return jsonify({"error": "test_id must be a non-empty string"}), 400
+        if not isinstance(positive, bool):
+            return jsonify({"error": "positive must be a boolean"}), 400
+
+        symptom_key = DIAGNOSTIC_SYMPTOM_KEYS.get(test_id.strip())
+        if symptom_key is None:
+            return jsonify({"error": "Unknown test_id"}), 400
+
+        engine: BayesianInferenceEngine = rec["engine"]
+        probs = _posterior_after_diagnostic_preview(
+            engine, symptom_key, positive, DIAGNOSTIC_LIKELIHOOD_WEIGHT
+        )
+        return jsonify({"probabilities": probs})
 
     @app.get("/session/<session_id>/triage")
     def session_triage(session_id: str):

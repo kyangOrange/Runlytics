@@ -8,7 +8,7 @@ export function Home() {
   function startTest() {
     setSessionId(null)
     setSessionProbabilities({})
-    navigate('/test/intake')
+    navigate('/test/anatomy')
   }
 
   return (

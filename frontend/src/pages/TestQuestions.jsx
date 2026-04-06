@@ -3,14 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAppState } from '../context/AppStateContext'
 import { ProbabilityChart } from '../components/ProbabilityChart'
+import { optionEntriesNotSureLast } from '../optionOrder'
 
 export function TestQuestions() {
   const { userId, sessionId, sessionProbabilities, setSessionProbabilities } = useAppState()
   const navigate = useNavigate()
   const [question, setQuestion] = useState(null)
+  const [selected, setSelected] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [answering, setAnswering] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
 
   useEffect(() => {
     if (userId == null) return
@@ -40,6 +43,7 @@ export function TestQuestions() {
           whyAsk: nq.why_ask,
           options: nq.options ?? null,
         })
+        setSelected(null)
       } catch (e) {
         if (!cancelled) setError(e.message ?? 'Could not load questions')
       } finally {
@@ -53,12 +57,37 @@ export function TestQuestions() {
     }
   }, [userId, sessionId, navigate, setSessionProbabilities])
 
-  async function handleAnswer(answer) {
+  useEffect(() => {
+    if (!sessionId || !question || selected == null) return
+    let cancelled = false
+
+    async function run() {
+      setPreviewing(true)
+      try {
+        const res = await api.previewAnswer(sessionId, question.symptom, selected)
+        if (!cancelled && res?.probabilities) {
+          setSessionProbabilities(res.probabilities)
+        }
+      } catch {
+        // Best-effort preview
+      } finally {
+        if (!cancelled) setPreviewing(false)
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [selected, sessionId, question?.symptom, setSessionProbabilities])
+
+  async function submitAnswer() {
     if (!sessionId || !question) return
+    if (selected == null) return
     setAnswering(true)
     setError('')
     try {
-      const res = await api.answer(sessionId, question.symptom, answer)
+      const res = await api.answer(sessionId, question.symptom, selected)
       if (res.probabilities) {
         setSessionProbabilities(res.probabilities)
       }
@@ -80,6 +109,7 @@ export function TestQuestions() {
         whyAsk: nq.why_ask,
         options: nq.options ?? null,
       })
+      setSelected(null)
     } catch (e) {
       setError(e.message ?? 'Could not save answer')
     } finally {
@@ -129,13 +159,14 @@ export function TestQuestions() {
           }
         >
           {question?.options ? (
-            Object.entries(question.options).map(([value, label]) => (
+            optionEntriesNotSureLast(question.options).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
                 className="btn btn--ghost question-card__option-btn"
-                disabled={answering || !question}
-                onClick={() => handleAnswer(value)}
+                disabled={answering || previewing || !question}
+                aria-pressed={selected === value}
+                onClick={() => setSelected(value)}
               >
                 {label}
               </button>
@@ -145,21 +176,33 @@ export function TestQuestions() {
               <button
                 type="button"
                 className="btn btn--primary"
-                disabled={answering || !question}
-                onClick={() => handleAnswer(true)}
+                disabled={answering || previewing || !question}
+                aria-pressed={selected === true}
+                onClick={() => setSelected(true)}
               >
                 Yes
               </button>
               <button
                 type="button"
                 className="btn btn--ghost"
-                disabled={answering || !question}
-                onClick={() => handleAnswer(false)}
+                disabled={answering || previewing || !question}
+                aria-pressed={selected === false}
+                onClick={() => setSelected(false)}
               >
                 No
               </button>
             </>
           )}
+        </div>
+        <div className="question-card__actions question-card__actions--footer">
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={answering || selected == null}
+            onClick={submitAnswer}
+          >
+            {answering ? 'Saving…' : 'Next'}
+          </button>
         </div>
       </div>
       {error ? <p className="form__error">{error}</p> : null}
