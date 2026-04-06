@@ -4,35 +4,58 @@ from prior_modifiers import priors_from_profile
 
 
 class BayesianInferenceEngine:
+    EXPERIENCE_MULTIPLIERS = {
+        "beginner": {
+            "shin_splints": 1.3,
+            "stress_fracture": 1.4,
+        },
+        "intermediate": {
+            "shin_splints": 1.0,
+            "stress_fracture": 1.0,
+        },
+        "experienced": {
+            "shin_splints": 0.8,
+            "stress_fracture": 0.85,
+        },
+    }
+
     def __init__(self, verbose: bool = True, profile: dict[str, Any] | None = None):
         self.verbose = verbose
         # Priors: P(condition), optionally adjusted from user profile before symptoms
         self.probabilities = dict(priors_from_profile(profile))
+        exp = profile.get("running_experience") if profile else None
+        self.apply_experience_prior(exp)
 
         # Likelihoods: P(symptom | condition)
         # Placeholder values — tune/replace with real estimates later.
         self.likelihoods = {
             "shin_splints": {
-                "pain_on_inner_shin": 0.7,
                 "pain_worse_with_running": 0.8,
-                "point_tenderness": 0.4,
                 "pain_at_rest": 0.2,
-                "swelling": 0.3,
                 "positive_hop_test": 0.1,
             },
             "stress_fracture": {
-                "pain_on_inner_shin": 0.4,
                 "pain_worse_with_running": 0.7,
-                "point_tenderness": 0.8,
                 "pain_at_rest": 0.6,
-                "swelling": 0.4,
                 "positive_hop_test": 0.9,
             },
         }
 
-        self._normalize()
         if self.verbose:
             self._print_distribution()
+
+    def apply_experience_prior(self, experience_level: str | None) -> None:
+        """Scale condition priors by running-experience tier, then renormalize."""
+        if not experience_level or not isinstance(experience_level, str):
+            return
+        level = experience_level.strip().lower()
+        multipliers = self.EXPERIENCE_MULTIPLIERS.get(level)
+        if not multipliers:
+            return
+        for condition in self.probabilities:
+            if condition in multipliers:
+                self.probabilities[condition] *= multipliers[condition]
+        self._normalize()
 
     def update(self, symptom: str) -> None:
         """
@@ -76,6 +99,5 @@ class BayesianInferenceEngine:
 if __name__ == "__main__":
     engine = BayesianInferenceEngine()
     engine.update("pain_worse_with_running")
-    engine.update("point_tenderness")
     engine.update("pain_at_rest")
     engine.update("positive_hop_test")

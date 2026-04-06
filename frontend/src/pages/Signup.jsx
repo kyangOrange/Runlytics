@@ -2,6 +2,10 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAppState } from '../context/AppStateContext'
+import {
+  EQUIPMENT_ACCESS_OPTIONS,
+  RUNNING_EXPERIENCE_OPTIONS,
+} from '../profileOptions'
 
 const SEX_OPTIONS = [
   { value: 'female', label: 'Female' },
@@ -19,7 +23,8 @@ export function Signup() {
   const [age, setAge] = useState('')
   const [biologicalSex, setBiologicalSex] = useState('female')
   const [priorInjury, setPriorInjury] = useState(false)
-  const [bodyweightOnly, setBodyweightOnly] = useState(true)
+  const [equipmentAccess, setEquipmentAccess] = useState('bodyweight')
+  const [runningExperience, setRunningExperience] = useState('intermediate')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -41,7 +46,8 @@ export function Signup() {
         age: ageNum,
         biological_sex: biologicalSex,
         prior_injury_same_area: priorInjury,
-        equipment_bodyweight_only: bodyweightOnly,
+        equipment_access: equipmentAccess,
+        running_experience: runningExperience,
       })
       setUserId(data.user_id)
       navigate('/home', { replace: true })
@@ -131,6 +137,27 @@ export function Signup() {
               epidemiology).
             </span>
           </label>
+          <div className="form__label form__label--static">Running level</div>
+          <div className="form__radio-list" role="group" aria-label="Running level">
+            {RUNNING_EXPERIENCE_OPTIONS.map((o) => (
+              <label key={o.value} className="form__radio-card">
+                <input
+                  type="radio"
+                  name="running_experience"
+                  value={o.value}
+                  checked={runningExperience === o.value}
+                  onChange={() => setRunningExperience(o.value)}
+                />
+                <span className="form__radio-card__text">
+                  <span className="form__radio-card__title">{o.label}</span>
+                  <span className="form__radio-card__desc">{o.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <span className="form__hint">
+            Used to adjust starting injury-risk priors (novice vs experienced loading patterns).
+          </span>
           <label className="form__checkbox">
             <input
               type="checkbox"
@@ -144,20 +171,24 @@ export function Signup() {
               </span>
             </span>
           </label>
-          <label className="form__checkbox">
-            <input
-              type="checkbox"
-              checked={bodyweightOnly}
-              onChange={(e) => setBodyweightOnly(e.target.checked)}
-            />
-            <span>
-              Prefer bodyweight-only recovery guidance (limited or no gym equipment)
-              <span className="form__hint form__hint--inline">
-                For recovery calendar (coming soon): default to bodyweight exercises; equipment options as
-                upgrades.
-              </span>
-            </span>
-          </label>
+          <div className="form__label form__label--static">Equipment access</div>
+          <div className="form__radio-list" role="group" aria-label="Equipment access">
+            {EQUIPMENT_ACCESS_OPTIONS.map((o) => (
+              <label key={o.value} className="form__radio-card">
+                <input
+                  type="radio"
+                  name="equipment_access"
+                  value={o.value}
+                  checked={equipmentAccess === o.value}
+                  onChange={() => setEquipmentAccess(o.value)}
+                />
+                <span className="form__radio-card__text">
+                  <span className="form__radio-card__title">{o.label}</span>
+                  <span className="form__radio-card__desc">{o.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
         </fieldset>
 
         {error ? <p className="form__error">{error}</p> : null}

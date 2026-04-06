@@ -22,6 +22,8 @@ DATABASE = os.path.join(_BASE_DIR, os.environ.get("DATABASE_NAME", "runlytics.db
 SESSIONS: dict[str, dict[str, Any]] = {}
 
 BIOLOGICAL_SEX_VALUES = frozenset({"female", "male", "other", "prefer_not_say"})
+RUNNING_EXPERIENCE_VALUES = frozenset({"beginner", "intermediate", "experienced"})
+EQUIPMENT_ACCESS_VALUES = frozenset({"bodyweight", "gym"})
 
 _DEFAULT_CORS = [
     "http://127.0.0.1:5173",
@@ -68,6 +70,7 @@ def _migrate_users_columns(conn: sqlite3.Connection) -> None:
         ("biological_sex", "TEXT"),
         ("prior_injury_same_area", "INTEGER"),
         ("equipment_bodyweight_only", "INTEGER"),
+        ("running_experience", "TEXT"),
     ]
     for col, col_type in additions:
         if col not in existing:
@@ -90,7 +93,14 @@ def _row_to_profile_for_engine(row: sqlite3.Row) -> dict[str, Any]:
         "biological_sex": _row_get(row, "biological_sex"),
         "age": _row_get(row, "age"),
         "prior_injury_same_area": bool(inj) if inj is not None else False,
+        "running_experience": _row_get(row, "running_experience"),
     }
+
+
+def _equipment_access_public(eq: Any) -> str | None:
+    if eq is None:
+        return None
+    return "bodyweight" if bool(eq) else "gym"
 
 
 def _row_to_profile_public(row: sqlite3.Row) -> dict[str, Any] | None:
@@ -106,6 +116,8 @@ def _row_to_profile_public(row: sqlite3.Row) -> dict[str, Any] | None:
         "biological_sex": _row_get(row, "biological_sex"),
         "prior_injury_same_area": bool(inj) if inj is not None else None,
         "equipment_bodyweight_only": bool(eq) if eq is not None else None,
+        "equipment_access": _equipment_access_public(eq),
+        "running_experience": _row_get(row, "running_experience"),
     }
 
 
@@ -182,7 +194,8 @@ def create_app() -> Flask:
             "age",
             "biological_sex",
             "prior_injury_same_area",
-            "equipment_bodyweight_only",
+            "equipment_access",
+            "running_experience",
         )
         missing = [k for k in required if k not in data]
         if missing:
@@ -194,7 +207,8 @@ def create_app() -> Flask:
         age = data["age"]
         biological_sex = data["biological_sex"]
         prior_injury = data["prior_injury_same_area"]
-        equipment_bw = data["equipment_bodyweight_only"]
+        equipment_access = data["equipment_access"]
+        running_experience = data["running_experience"]
 
         if not isinstance(email, str) or not isinstance(password, str):
             return jsonify({"error": "email and password must be strings"}), 400
@@ -226,8 +240,22 @@ def create_app() -> Flask:
 
         if not isinstance(prior_injury, bool):
             return jsonify({"error": "prior_injury_same_area must be a boolean"}), 400
-        if not isinstance(equipment_bw, bool):
-            return jsonify({"error": "equipment_bodyweight_only must be a boolean"}), 400
+        if not isinstance(equipment_access, str):
+            return jsonify({"error": "equipment_access must be a string"}), 400
+        equipment_access = equipment_access.strip().lower()
+        if equipment_access not in EQUIPMENT_ACCESS_VALUES:
+            return jsonify({"error": "equipment_access must be bodyweight or gym"}), 400
+        equipment_bw = equipment_access == "bodyweight"
+
+        if not isinstance(running_experience, str):
+            return jsonify({"error": "running_experience must be a string"}), 400
+        running_experience = running_experience.strip().lower()
+        if running_experience not in RUNNING_EXPERIENCE_VALUES:
+            return jsonify(
+                {
+                    "error": "running_experience must be one of: beginner, intermediate, experienced",
+                }
+            ), 400
 
         password_hash = generate_password_hash(password)
         try:
@@ -236,8 +264,8 @@ def create_app() -> Flask:
                     """
                     INSERT INTO users (
                         email, password_hash, display_name, age, biological_sex,
-                        prior_injury_same_area, equipment_bodyweight_only
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        prior_injury_same_area, equipment_bodyweight_only, running_experience
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         email,
@@ -247,6 +275,7 @@ def create_app() -> Flask:
                         biological_sex,
                         1 if prior_injury else 0,
                         1 if equipment_bw else 0,
+                        running_experience,
                     ),
                 )
                 user_id = cur.lastrowid
@@ -296,7 +325,7 @@ def create_app() -> Flask:
             row = conn.execute(
                 """
                 SELECT id, email, display_name, age, biological_sex,
-                       prior_injury_same_area, equipment_bodyweight_only
+                       prior_injury_same_area, equipment_bodyweight_only, running_experience
                 FROM users WHERE id = ?
                 """,
                 (user_id,),
@@ -318,18 +347,21 @@ def create_app() -> Flask:
             "biological_sex",
             "prior_injury_same_area",
             "equipment_bodyweight_only",
+            "equipment_access",
+            "running_experience",
         }
         if not isinstance(data, dict) or not any(k in data for k in allowed):
             return jsonify(
                 {"error": "Provide at least one of: display_name, age, biological_sex, "
-                "prior_injury_same_area, equipment_bodyweight_only"}
+                "prior_injury_same_area, equipment_bodyweight_only, equipment_access, "
+                "running_experience"}
             ), 400
 
         with get_db() as conn:
             row = conn.execute(
                 """
                 SELECT id, email, display_name, age, biological_sex,
-                       prior_injury_same_area, equipment_bodyweight_only
+                       prior_injury_same_area, equipment_bodyweight_only, running_experience
                 FROM users WHERE id = ?
                 """,
                 (user_id,),
@@ -383,6 +415,30 @@ def create_app() -> Flask:
                 sets.append("equipment_bodyweight_only = ?")
                 values.append(1 if data["equipment_bodyweight_only"] else 0)
 
+            if "equipment_access" in data:
+                ea = data["equipment_access"]
+                if not isinstance(ea, str):
+                    return jsonify({"error": "equipment_access must be a string"}), 400
+                ea = ea.strip().lower()
+                if ea not in EQUIPMENT_ACCESS_VALUES:
+                    return jsonify({"error": "equipment_access must be bodyweight or gym"}), 400
+                sets.append("equipment_bodyweight_only = ?")
+                values.append(1 if ea == "bodyweight" else 0)
+
+            if "running_experience" in data:
+                rx = data["running_experience"]
+                if not isinstance(rx, str):
+                    return jsonify({"error": "running_experience must be a string"}), 400
+                rx = rx.strip().lower()
+                if rx not in RUNNING_EXPERIENCE_VALUES:
+                    return jsonify(
+                        {
+                            "error": "running_experience must be one of: beginner, intermediate, experienced",
+                        }
+                    ), 400
+                sets.append("running_experience = ?")
+                values.append(rx)
+
             if not sets:
                 return jsonify({"error": "No valid fields to update"}), 400
 
@@ -396,7 +452,7 @@ def create_app() -> Flask:
             row = conn.execute(
                 """
                 SELECT id, email, display_name, age, biological_sex,
-                       prior_injury_same_area, equipment_bodyweight_only
+                       prior_injury_same_area, equipment_bodyweight_only, running_experience
                 FROM users WHERE id = ?
                 """,
                 (user_id,),
@@ -422,7 +478,7 @@ def create_app() -> Flask:
             row = conn.execute(
                 """
                 SELECT id, email, display_name, age, biological_sex,
-                       prior_injury_same_area, equipment_bodyweight_only
+                       prior_injury_same_area, equipment_bodyweight_only, running_experience
                 FROM users WHERE id = ?
                 """,
                 (user_id,),
@@ -461,13 +517,16 @@ def create_app() -> Flask:
         if q is None:
             return jsonify({"complete": True})
 
-        return jsonify(
-            {
-                "complete": False,
-                "text": q["text"],
-                "symptom": q["symptom"],
-            }
-        )
+        out: dict[str, Any] = {
+            "complete": False,
+            "text": q["text"],
+            "symptom": q["symptom"],
+        }
+        if q.get("why_ask"):
+            out["why_ask"] = q["why_ask"]
+        if q.get("answer_guide"):
+            out["answer_guide"] = q["answer_guide"]
+        return jsonify(out)
 
     @app.post("/session/<session_id>/answer")
     def session_answer(session_id: str):

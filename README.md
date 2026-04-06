@@ -119,10 +119,10 @@ The API allows `http://localhost:5173` and `http://127.0.0.1:5173` by default. F
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Health check for monitors |
-| `POST` | `/auth/signup` | Body: `email`, `password`, `display_name`, `age`, `biological_sex` (`female` \| `male` \| `other` \| `prefer_not_say`), `prior_injury_same_area`, `equipment_bodyweight_only` (booleans). Profile fields (except name/email/equipment flag for triage) adjust **starting priors** in `bayesian_engine` via `prior_modifiers.py`. |
+| `POST` | `/auth/signup` | Body: `email`, `password`, `display_name`, `age`, `biological_sex` (`female` \| `male` \| `other` \| `prefer_not_say`), `prior_injury_same_area` (boolean), `equipment_access` (`bodyweight` \| `gym`), `running_experience` (`beginner` \| `intermediate` \| `experienced`). Stored as `equipment_bodyweight_only` plus `running_experience`. Profile fields (except name/email) adjust **starting priors** in `bayesian_engine` via `prior_modifiers.py` and experience multipliers in `bayesian_engine.py`. |
 | `POST` | `/auth/login` | Body: `{ "email", "password" }` |
-| `GET` | `/user/<user_id>/profile` | Public profile JSON (no password hash). |
-| `PATCH` | `/user/<user_id>/profile` | Partial update: any of `display_name`, `age`, `biological_sex`, `prior_injury_same_area`, `equipment_bodyweight_only`. Returns updated profile. |
+| `GET` | `/user/<user_id>/profile` | Public profile JSON (no password hash). Includes `equipment_access` (`bodyweight` \| `gym`) and `running_experience`. |
+| `PATCH` | `/user/<user_id>/profile` | Partial update: any of `display_name`, `age`, `biological_sex`, `prior_injury_same_area`, `equipment_access`, `running_experience`, or legacy `equipment_bodyweight_only`. Returns updated profile. |
 | `POST` | `/session/new` | Body: `{ "user_id" }` — loads user row and builds engine with **profile-adjusted priors**. |
 | `GET` | `/session/<id>/next-question` | Next question or `{ "complete": true }` |
 | `POST` | `/session/<id>/answer` | Body: `{ "symptom", "answer" }` (boolean) |

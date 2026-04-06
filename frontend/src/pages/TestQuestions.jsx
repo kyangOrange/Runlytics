@@ -32,7 +32,12 @@ export function TestQuestions() {
           navigate('/test/results', { replace: true })
           return
         }
-        setQuestion({ text: nq.text, symptom: nq.symptom })
+        setQuestion({
+          text: nq.text,
+          symptom: nq.symptom,
+          whyAsk: nq.why_ask,
+          answerGuide: nq.answer_guide,
+        })
       } catch (e) {
         if (!cancelled) setError(e.message ?? 'Could not start session')
       } finally {
@@ -62,7 +67,12 @@ export function TestQuestions() {
         navigate('/test/results', { replace: true })
         return
       }
-      setQuestion({ text: nq.text, symptom: nq.symptom })
+      setQuestion({
+        text: nq.text,
+        symptom: nq.symptom,
+        whyAsk: nq.why_ask,
+        answerGuide: nq.answer_guide,
+      })
     } catch (e) {
       setError(e.message ?? 'Could not save answer')
     } finally {
@@ -95,6 +105,14 @@ export function TestQuestions() {
       <ProbabilityChart probabilities={probabilities} />
       <div className="question-card">
         <p className="question-card__text">{question?.text}</p>
+        {question?.whyAsk ? (
+          <p className="question-card__why">
+            <span className="question-card__why-label">Why we ask:</span> {question.whyAsk}
+          </p>
+        ) : null}
+        {question?.answerGuide ? (
+          <p className="question-card__guide">{question.answerGuide}</p>
+        ) : null}
         <div className="question-card__actions">
           <button
             type="button"

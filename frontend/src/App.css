@@ -246,9 +246,32 @@
 }
 
 .question-card__text {
-  margin: 0 0 1.25rem;
+  margin: 0 0 1rem;
   font-size: 1.05rem;
   line-height: 1.45;
+}
+
+.question-card__why {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.question-card__why-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.question-card__guide {
+  margin: 0 0 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text);
+  padding: 0.65rem 0.75rem;
+  background: #f4f6f9;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--border);
 }
 
 .question-card__actions {
@@ -381,6 +404,60 @@
 .form__checkbox input {
   margin-top: 0.2rem;
   flex-shrink: 0;
+}
+
+.form__label--static {
+  margin: 0 0 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.form__radio-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.form__radio-card {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  line-height: 1.35;
+}
+
+.form__radio-card:focus-within {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 1px;
+}
+
+.form__radio-card input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.form__radio-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+}
+
+.form__radio-card__title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.form__radio-card__desc {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--text-muted);
 }
 
 .btn--small {

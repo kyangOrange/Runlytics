@@ -91,6 +91,10 @@ class QuestionSelector:
     def _is_stopped(self) -> bool:
         if any(p >= self.confidence_threshold for p in self.engine.probabilities.values()):
             return True
+        if len(self._asked) >= 4 and max(self.engine.probabilities.values()) > 0.75:
+            return True
+        if len(self._asked) >= 7:
+            return True
         if len(self._asked) >= len(self.questions):
             return True
         return False
@@ -145,7 +149,7 @@ class QuestionSelector:
             symptom = self._symptom_key(q)
             condition_specificity = _condition_specificity(
                 self.engine, leading, symptom
-            )
+            )#this is the condition specificity score
             final_score = ig + (self.BOOST_WEIGHT * condition_specificity)
             if final_score > best_score:
                 best_score = final_score
@@ -168,24 +172,30 @@ class QuestionSelector:
 
 QUESTIONS = [
     {
-        "text": "Does your pain get worse after the first 10-15 minutes of running?",
+        "text": (
+            "Does the pain improve after the first 10–15 minutes of running "
+            "(once you've warmed up), or does it worsen?"
+        ),
+        "why_ask": (
+            "Some injuries feel better once warmed up — others get worse with more running. "
+            "This is one of the most important signals we use."
+        ),
+        "answer_guide": (
+            "Answer Yes if the pain typically worsens after you've warmed up and keep running; "
+            "No if it improves or stays about the same."
+        ),
         "symptom": "pain_worse_with_running",
     },
     {
-        "text": "Do you feel pain when resting or sitting?",
+        "text": "Is the pain present at rest or only during activity?",
+        "why_ask": (
+            "Pain that affects you when you're not running is a warning sign that this may be "
+            "more serious than a running-only issue."
+        ),
+        "answer_guide": (
+            "Answer Yes if you have pain at rest too; No if pain happens only during activity."
+        ),
         "symptom": "pain_at_rest",
-    },
-    {
-        "text": "Is there swelling around the area?",
-        "symptom": "swelling",
-    },
-    {
-        "text": "Does pressing directly on the bone reproduce the pain?",
-        "symptom": "point_tenderness",
-    },
-    {
-        "text": "Is the pain on the inner side of your shin?",
-        "symptom": "pain_on_inner_shin",
     },
 ]
 

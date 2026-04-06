@@ -2,6 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAppState } from '../context/AppStateContext'
+import {
+  EQUIPMENT_ACCESS_OPTIONS,
+  formatEquipmentAccess,
+  formatRunningExperience,
+  profileEquipmentAccess,
+  RUNNING_EXPERIENCE_OPTIONS,
+} from '../profileOptions'
 
 const SEX_LABELS = {
   female: 'Female',
@@ -29,7 +36,8 @@ function profileToForm(p) {
     age: p.age != null ? String(p.age) : '',
     biological_sex: p.biological_sex ?? 'prefer_not_say',
     prior_injury_same_area: Boolean(p.prior_injury_same_area),
-    equipment_bodyweight_only: p.equipment_bodyweight_only !== false,
+    equipment_access: profileEquipmentAccess(p),
+    running_experience: p.running_experience ?? 'intermediate',
   }
 }
 
@@ -99,7 +107,8 @@ export function Profile() {
         age: ageNum,
         biological_sex: form.biological_sex,
         prior_injury_same_area: form.prior_injury_same_area,
-        equipment_bodyweight_only: form.equipment_bodyweight_only,
+        equipment_access: form.equipment_access,
+        running_experience: form.running_experience,
       })
       setProfile(updated)
       setForm(profileToForm(updated))
@@ -110,6 +119,8 @@ export function Profile() {
       setSaving(false)
     }
   }
+
+  const runningDetail = RUNNING_EXPERIENCE_OPTIONS.find((o) => o.value === profile?.running_experience)
 
   return (
     <div className="page page--profile">
@@ -161,6 +172,16 @@ export function Profile() {
               </dd>
             </div>
             <div className="profile-dl__row">
+              <dt>Running level</dt>
+              <dd>{formatRunningExperience(profile.running_experience)}</dd>
+              {runningDetail ? (
+                <dd className="profile-dl__why">{runningDetail.description}</dd>
+              ) : null}
+              <dd className="profile-dl__why">
+                Prior modifier for shin splints and stress-fracture risk by training background.
+              </dd>
+            </div>
+            <div className="profile-dl__row">
               <dt>Prior injury (same area)</dt>
               <dd>
                 {profile.prior_injury_same_area === true
@@ -174,14 +195,8 @@ export function Profile() {
               </dd>
             </div>
             <div className="profile-dl__row">
-              <dt>Bodyweight-only preference</dt>
-              <dd>
-                {profile.equipment_bodyweight_only === true
-                  ? 'Yes'
-                  : profile.equipment_bodyweight_only === false
-                    ? 'No'
-                    : '—'}
-              </dd>
+              <dt>Equipment access</dt>
+              <dd>{formatEquipmentAccess(profile.equipment_access)}</dd>
               <dd className="profile-dl__why">
                 For recovery calendar (coming soon): default to bodyweight exercises; equipment options as
                 upgrades.
@@ -197,7 +212,8 @@ export function Profile() {
       {profile && editing && form ? (
         <form className="form profile-edit-form" onSubmit={saveEdit}>
           <p className="page__sub">
-            Email can't be changed here. When you save, we’ll update your profile for your next assessment.
+            Email cannot be changed here. When you save, we will update your profile for your next
+            assessment.
           </p>
           <p className="form__muted">
             <strong>Email:</strong> {profile.email}
@@ -238,6 +254,24 @@ export function Profile() {
             </select>
             <span className="form__hint">Prior modifier for stress-fracture probability.</span>
           </label>
+          <div className="form__label form__label--static">Running level</div>
+          <div className="form__radio-list" role="group" aria-label="Running level">
+            {RUNNING_EXPERIENCE_OPTIONS.map((o) => (
+              <label key={o.value} className="form__radio-card">
+                <input
+                  type="radio"
+                  name="edit_running_experience"
+                  value={o.value}
+                  checked={form.running_experience === o.value}
+                  onChange={() => setForm((f) => ({ ...f, running_experience: o.value }))}
+                />
+                <span className="form__radio-card__text">
+                  <span className="form__radio-card__title">{o.label}</span>
+                  <span className="form__radio-card__desc">{o.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
           <label className="form__checkbox">
             <input
               type="checkbox"
@@ -246,14 +280,24 @@ export function Profile() {
             />
             <span>Prior injury to the same area (shin / lower leg)</span>
           </label>
-          <label className="form__checkbox">
-            <input
-              type="checkbox"
-              checked={form.equipment_bodyweight_only}
-              onChange={(e) => setForm((f) => ({ ...f, equipment_bodyweight_only: e.target.checked }))}
-            />
-            <span>Prefer bodyweight-only recovery guidance (limited / no gym equipment)</span>
-          </label>
+          <div className="form__label form__label--static">Equipment access</div>
+          <div className="form__radio-list" role="group" aria-label="Equipment access">
+            {EQUIPMENT_ACCESS_OPTIONS.map((o) => (
+              <label key={o.value} className="form__radio-card">
+                <input
+                  type="radio"
+                  name="edit_equipment_access"
+                  value={o.value}
+                  checked={form.equipment_access === o.value}
+                  onChange={() => setForm((f) => ({ ...f, equipment_access: o.value }))}
+                />
+                <span className="form__radio-card__text">
+                  <span className="form__radio-card__title">{o.label}</span>
+                  <span className="form__radio-card__desc">{o.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
           <div className="profile-edit-actions">
             <button type="submit" className="btn btn--primary" disabled={saving}>
               {saving ? 'Saving…' : 'Save changes'}
