@@ -16,6 +16,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from bayesian_engine import BayesianInferenceEngine
 from question_selector import QUESTIONS, QuestionSelector
 from scoring import (
+    TRAINING_LOAD_KEYS,
     placeholder_acwr_risk,
     triage_from_severity,
     validate_training_load_body,
@@ -26,11 +27,11 @@ DATABASE = os.path.join(_BASE_DIR, os.environ.get("DATABASE_NAME", "runlytics.db
 
 SESSIONS: dict[str, dict[str, Any]] = {}
 
-# Maps API test_id -> engine likelihood key (placeholder guided tests)
+# Maps API test_id -> engine likelihood key (guided clinical-style tests)
 DIAGNOSTIC_SYMPTOM_KEYS: dict[str, str] = {
-    "hop_single_leg": "diag_single_leg_hop",
-    "shin_bone_palpation": "diag_shin_palpation",
-    "morning_stiffness_first_steps": "diag_morning_stiffness_severe",
+    "positive_hop_test": "positive_hop_test",
+    "point_tenderness_palpation": "point_tenderness_palpation",
+    "pain_improves_with_warmup": "pain_improves_with_warmup",
 }
 DIAGNOSTIC_LIKELIHOOD_WEIGHT = 2.0
 
@@ -492,17 +493,21 @@ def create_app() -> Flask:
             return jsonify({"error": "Submit training load (POST .../training-load) first"}), 400
 
         selector: QuestionSelector = rec["selector"]
+        engine: BayesianInferenceEngine = rec["engine"]
+        probs = _probabilities_payload(engine)
+
         if selector.should_stop():
-            return jsonify({"complete": True})
+            return jsonify({"complete": True, "probabilities": probs})
 
         q = selector.get_next_question()
         if q is None:
-            return jsonify({"complete": True})
+            return jsonify({"complete": True, "probabilities": probs})
 
         out: dict[str, Any] = {
             "complete": False,
             "text": q["text"],
             "symptom": q["symptom"],
+            "probabilities": probs,
         }
         if q.get("why_ask"):
             out["why_ask"] = q["why_ask"]
@@ -558,12 +563,7 @@ def create_app() -> Flask:
         if not ok:
             return jsonify({"error": err}), 400
 
-        answers_norm = {
-            "weekly_volume_trend": str(data["weekly_volume_trend"]).strip().lower(),
-            "volume_last_7_vs_usual": str(data["volume_last_7_vs_usual"]).strip().lower(),
-            "hard_sessions_last_week": str(data["hard_sessions_last_week"]).strip().lower(),
-            "sudden_training_change": str(data["sudden_training_change"]).strip().lower(),
-        }
+        answers_norm = {k: str(data[k]).strip().lower() for k in TRAINING_LOAD_KEYS}
         risk = placeholder_acwr_risk(answers_norm)
 
         engine: BayesianInferenceEngine = rec["engine"]

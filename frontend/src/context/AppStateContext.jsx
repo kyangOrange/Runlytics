@@ -18,6 +18,7 @@ function readStoredUserId() {
 export function AppStateProvider({ children }) {
   const [userId, setUserId] = useState(readStoredUserId)
   const [sessionId, setSessionId] = useState(null)
+  const [sessionProbabilities, setSessionProbabilities] = useState({})
 
   useEffect(() => {
     if (userId == null) {
@@ -33,13 +34,16 @@ export function AppStateProvider({ children }) {
       setUserId,
       sessionId,
       setSessionId,
+      sessionProbabilities,
+      setSessionProbabilities,
       logout: () => {
         setUserId(null)
         setSessionId(null)
+        setSessionProbabilities({})
         localStorage.removeItem(USER_ID_KEY)
       },
     }),
-    [userId, sessionId],
+    [userId, sessionId, sessionProbabilities],
   )
 
   return (

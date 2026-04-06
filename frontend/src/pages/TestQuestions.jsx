@@ -5,9 +5,8 @@ import { useAppState } from '../context/AppStateContext'
 import { ProbabilityChart } from '../components/ProbabilityChart'
 
 export function TestQuestions() {
-  const { userId, sessionId } = useAppState()
+  const { userId, sessionId, sessionProbabilities, setSessionProbabilities } = useAppState()
   const navigate = useNavigate()
-  const [probabilities, setProbabilities] = useState({})
   const [question, setQuestion] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -28,6 +27,9 @@ export function TestQuestions() {
         }
         const nq = await api.nextQuestion(sessionId)
         if (cancelled) return
+        if (nq.probabilities) {
+          setSessionProbabilities(nq.probabilities)
+        }
         if (nq.complete) {
           navigate('/test/diagnostics', { replace: true })
           return
@@ -48,7 +50,7 @@ export function TestQuestions() {
     return () => {
       cancelled = true
     }
-  }, [userId, sessionId, navigate])
+  }, [userId, sessionId, navigate, setSessionProbabilities])
 
   async function handleAnswer(answer) {
     if (!sessionId || !question) return
@@ -56,12 +58,17 @@ export function TestQuestions() {
     setError('')
     try {
       const res = await api.answer(sessionId, question.symptom, answer)
-      setProbabilities(res.probabilities ?? {})
+      if (res.probabilities) {
+        setSessionProbabilities(res.probabilities)
+      }
       if (res.complete) {
         navigate('/test/diagnostics', { replace: true })
         return
       }
       const nq = await api.nextQuestion(sessionId)
+      if (nq.probabilities) {
+        setSessionProbabilities(nq.probabilities)
+      }
       if (nq.complete) {
         navigate('/test/diagnostics', { replace: true })
         return
@@ -80,7 +87,9 @@ export function TestQuestions() {
 
   if (loading) {
     return (
-      <div className="page">
+      <div className="page page--test">
+        <h1>Questions</h1>
+        <ProbabilityChart probabilities={sessionProbabilities} />
         <p className="page__sub">Loading questions…</p>
       </div>
     )
@@ -88,7 +97,9 @@ export function TestQuestions() {
 
   if (error && !question) {
     return (
-      <div className="page">
+      <div className="page page--test">
+        <h1>Questions</h1>
+        <ProbabilityChart probabilities={sessionProbabilities} />
         <p className="form__error">{error}</p>
         <button type="button" className="btn btn--ghost" onClick={() => navigate('/home')}>
           Back to home
@@ -100,7 +111,7 @@ export function TestQuestions() {
   return (
     <div className="page page--test">
       <h1>Questions</h1>
-      <ProbabilityChart probabilities={probabilities} />
+      <ProbabilityChart probabilities={sessionProbabilities} />
       <div className="question-card">
         <p className="question-card__text">{question?.text}</p>
         {question?.whyAsk ? (

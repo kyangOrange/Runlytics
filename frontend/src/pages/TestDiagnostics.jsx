@@ -6,10 +6,9 @@ import { ProbabilityChart } from '../components/ProbabilityChart'
 import { DIAGNOSTIC_STEPS } from '../trainingLoadOptions'
 
 export function TestDiagnostics() {
-  const { sessionId } = useAppState()
+  const { sessionId, sessionProbabilities, setSessionProbabilities } = useAppState()
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
-  const [probabilities, setProbabilities] = useState({})
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -34,7 +33,9 @@ export function TestDiagnostics() {
         test_id: current.testId,
         positive,
       })
-      setProbabilities(res.probabilities ?? {})
+      if (res.probabilities) {
+        setSessionProbabilities(res.probabilities)
+      }
       const next = step + 1
       if (next >= DIAGNOSTIC_STEPS.length) {
         navigate('/test/results', { replace: true })
@@ -52,20 +53,28 @@ export function TestDiagnostics() {
     <div className="page page--test">
       <h1>Guided checks</h1>
       <p className="page__sub">
-        Placeholder clinical-style tests. Each answer updates the model with higher weight than the
-        earlier yes/no questions.
+        Each answer updates the model using clinical-style likelihoods (stronger weight than the
+        earlier symptom questions).
       </p>
       <p className="form__muted">
         Step {step + 1} of {DIAGNOSTIC_STEPS.length}
+        {current?.tier != null ? ` · Tier ${current.tier}` : ''}
       </p>
 
-      <ProbabilityChart probabilities={probabilities} />
+      <ProbabilityChart probabilities={sessionProbabilities} />
 
       {current ? (
         <div className="question-card diagnostic-card">
           <h2 className="diagnostic-card__title">{current.title}</h2>
           <p className="diagnostic-card__instructions">{current.instructions}</p>
-          <p className="diagnostic-card__prompt">Does this test match a positive finding for you?</p>
+          {current.whyAsk ? (
+            <p className="diagnostic-card__why">
+              <span className="question-card__why-label">Why we ask:</span> {current.whyAsk}
+            </p>
+          ) : null}
+          <p className="diagnostic-card__prompt">
+            {current.prompt ?? 'Does this test match a positive finding for you?'}
+          </p>
           <div className="question-card__actions">
             <button
               type="button"
@@ -73,7 +82,7 @@ export function TestDiagnostics() {
               disabled={submitting}
               onClick={() => submitDiagnostic(true)}
             >
-              Yes
+              {current.yesLabel ?? 'Yes'}
             </button>
             <button
               type="button"
@@ -81,9 +90,10 @@ export function TestDiagnostics() {
               disabled={submitting}
               onClick={() => submitDiagnostic(false)}
             >
-              No
+              {current.noLabel ?? 'No'}
             </button>
           </div>
+          {current.source ? <p className="diagnostic-card__source">{current.source}</p> : null}
         </div>
       ) : null}
 

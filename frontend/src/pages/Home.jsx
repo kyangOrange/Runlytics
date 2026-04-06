@@ -2,11 +2,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAppState } from '../context/AppStateContext'
 
 export function Home() {
-  const { setSessionId } = useAppState()
+  const { setSessionId, setSessionProbabilities } = useAppState()
   const navigate = useNavigate()
 
   function startTest() {
     setSessionId(null)
+    setSessionProbabilities({})
     navigate('/test/intake')
   }
 

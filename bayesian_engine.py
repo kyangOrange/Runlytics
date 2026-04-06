@@ -32,18 +32,17 @@ class BayesianInferenceEngine:
             "shin_splints": {
                 "pain_worse_with_running": 0.8,
                 "pain_at_rest": 0.2,
+                # Guided diagnostics — P(observed positive finding | condition)
                 "positive_hop_test": 0.1,
-                "diag_single_leg_hop": 0.2,
-                "diag_shin_palpation": 0.45,
-                "diag_morning_stiffness_severe": 0.3,
+                "point_tenderness_palpation": 0.3,
+                "pain_improves_with_warmup": 0.7,
             },
             "stress_fracture": {
                 "pain_worse_with_running": 0.7,
                 "pain_at_rest": 0.6,
                 "positive_hop_test": 0.9,
-                "diag_single_leg_hop": 0.82,
-                "diag_shin_palpation": 0.78,
-                "diag_morning_stiffness_severe": 0.65,
+                "point_tenderness_palpation": 0.85,
+                "pain_improves_with_warmup": 0.15,
             },
         }
 

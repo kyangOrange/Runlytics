@@ -10,17 +10,51 @@ from typing import Any
 
 # Expected JSON keys from POST /session/<id>/training-load
 TRAINING_LOAD_KEYS = (
-    "weekly_volume_trend",
-    "volume_last_7_vs_usual",
-    "hard_sessions_last_week",
-    "sudden_training_change",
+    "days_per_week_typical",
+    "volume_this_week_vs_usual",
+    "longest_run_vs_recent_max",
+    "recent_running_trend",
+    "surface_change_recent",
 )
 
 _TRAINING_VALUE_SETS: dict[str, frozenset[str]] = {
-    "weekly_volume_trend": frozenset({"decreasing", "stable", "increasing"}),
-    "volume_last_7_vs_usual": frozenset({"less", "same", "more", "much_more"}),
-    "hard_sessions_last_week": frozenset({"0", "1", "2", "3_plus"}),
-    "sudden_training_change": frozenset({"no", "yes"}),
+    "days_per_week_typical": frozenset(
+        {"d1_2", "d3_4", "d5_6", "every_day", "not_sure"}
+    ),
+    "volume_this_week_vs_usual": frozenset(
+        {
+            "less_or_same",
+            "bit_more",
+            "significantly_more",
+            "not_sure",
+        }
+    ),
+    "longest_run_vs_recent_max": frozenset(
+        {
+            "same_or_shorter",
+            "little_longer",
+            "significantly_longer",
+            "not_sure",
+        }
+    ),
+    "recent_running_trend": frozenset(
+        {
+            "stable_or_decreasing",
+            "gradual_increase",
+            "jumped_up",
+            "inconsistent",
+            "not_sure",
+        }
+    ),
+    "surface_change_recent": frozenset(
+        {
+            "no_change",
+            "harder_surfaces",
+            "more_uneven",
+            "inconsistent_surfaces",
+            "not_sure",
+        }
+    ),
 }
 
 
@@ -42,24 +76,63 @@ def validate_training_load_body(data: dict[str, Any]) -> tuple[bool, str]:
 def placeholder_acwr_risk(answers: dict[str, str]) -> float:
     """
     Synthetic 0-1 load-risk score (not a real ACWR).
-    Higher = more concern from training-load pattern alone.
+    Highest weight on longest-run spike vs recent max (single-session load jump).
     """
-    score = 0.22
-    trend = answers.get("weekly_volume_trend", "").lower()
-    vol7 = answers.get("volume_last_7_vs_usual", "").lower()
-    hard = answers.get("hard_sessions_last_week", "").lower()
-    sudden = answers.get("sudden_training_change", "").lower()
+    score = 0.18
 
-    if trend == "increasing":
-        score += 0.12
-    if vol7 in ("more", "much_more"):
-        score += 0.14 if vol7 == "more" else 0.22
-    if hard == "2":
-        score += 0.08
-    if hard == "3_plus":
-        score += 0.16
-    if sudden == "yes":
-        score += 0.14
+    days = answers.get("days_per_week_typical", "").lower()
+    vol = answers.get("volume_this_week_vs_usual", "").lower()
+    longest = answers.get("longest_run_vs_recent_max", "").lower()
+    trend = answers.get("recent_running_trend", "").lower()
+    surface = answers.get("surface_change_recent", "").lower()
+
+    # Q1 — baseline frequency (mild contextual nudge)
+    if days == "every_day":
+        score += 0.04
+    elif days == "d5_6":
+        score += 0.025
+    elif days == "not_sure":
+        score += 0.02
+
+    # Q2 — weekly volume vs usual (significantly_more absorbs former “way more” bucket)
+    if vol == "less_or_same":
+        score -= 0.02
+    elif vol == "bit_more":
+        score += 0.07
+    elif vol == "significantly_more":
+        score += 0.18
+    elif vol == "not_sure":
+        score += 0.02
+
+    # Q3 — single-session spike (strongest driver)
+    if longest == "little_longer":
+        score += 0.1
+    elif longest == "significantly_longer":
+        score += 0.28
+    elif longest == "not_sure":
+        score += 0.03
+
+    # Q4 — recent trend
+    if trend == "stable_or_decreasing":
+        score -= 0.02
+    elif trend == "gradual_increase":
+        score += 0.06
+    elif trend == "jumped_up":
+        score += 0.17
+    elif trend == "inconsistent":
+        score += 0.09
+    elif trend == "not_sure":
+        score += 0.02
+
+    # Q5 — surfaces
+    if surface == "harder_surfaces":
+        score += 0.11
+    elif surface == "more_uneven":
+        score += 0.09
+    elif surface == "inconsistent_surfaces":
+        score += 0.11
+    elif surface == "not_sure":
+        score += 0.02
 
     return max(0.0, min(1.0, score))
 

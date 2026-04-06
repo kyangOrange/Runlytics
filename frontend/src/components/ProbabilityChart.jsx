@@ -14,6 +14,9 @@ export function ProbabilityChart({ probabilities }) {
   return (
     <div className="probability-chart">
       <h3 className="probability-chart__title">Condition probabilities</h3>
+      {entries.length === 0 ? (
+        <p className="probability-chart__empty">No model estimates yet.</p>
+      ) : null}
       <ul className="probability-chart__list">
         {entries.map(([key, p]) => (
           <li key={key} className="probability-chart__row">

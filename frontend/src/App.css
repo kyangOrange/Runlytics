@@ -187,6 +187,12 @@
   color: var(--text-muted);
 }
 
+.probability-chart__empty {
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
 .probability-chart__list {
   list-style: none;
   margin: 0;
@@ -356,6 +362,13 @@
   margin-bottom: 0.25rem;
 }
 
+.form__fieldset-why {
+  margin: 0 0 0.85rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 .form__radio-card--compact {
   padding: 0.45rem 0.65rem;
 }
@@ -373,10 +386,26 @@
   color: var(--text-muted);
 }
 
+.diagnostic-card__why {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 .diagnostic-card__prompt {
   margin: 0 0 1rem;
   font-size: 0.95rem;
   font-weight: 500;
+}
+
+.diagnostic-card__source {
+  margin: 1rem 0 0;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-muted);
 }
 
 .page--signup {
